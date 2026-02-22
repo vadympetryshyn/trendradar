@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.celery_app import celery_app
 from app.database import SessionLocal
@@ -8,26 +8,62 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
-def analyze_niche_trends(self, niche_id: int):
-    from app.models import ScheduleConfig
-    from app.services.trend_analysis_service import TrendAnalysisService
+def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None):
+    from app.models import CollectionTask, ScheduleConfig
+    from app.services.trend_collection_service import TrendCollectionService
 
     db = SessionLocal()
     try:
-        service = TrendAnalysisService(db)
-        analysis = service.run_analysis(niche_id, celery_task_id=self.request.id)
+        # Get or create task record
+        task_record = None
+        if task_record_id:
+            task_record = db.query(CollectionTask).filter(CollectionTask.id == task_record_id).first()
 
+        if not task_record:
+            task_record = CollectionTask(
+                niche_id=niche_id,
+                celery_task_id=self.request.id,
+                status="running",
+            )
+            db.add(task_record)
+            db.commit()
+            db.refresh(task_record)
+
+        # Update status to running
+        task_record.status = "running"
+        task_record.celery_task_id = self.request.id
+        db.commit()
+
+        service = TrendCollectionService(db)
+        result = service.collect_trends(niche_id)
+
+        # Update task record with results
+        task_record.status = "completed"
+        task_record.trends_created = result.get("created", 0)
+        task_record.trends_expired = result.get("expired", 0)
+        task_record.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # Update schedule last_run_at
         schedules = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == niche_id).all()
         if schedules:
             for schedule in schedules:
                 schedule.last_run_at = datetime.now(timezone.utc)
             db.commit()
 
-        logger.info(f"Analysis {analysis.id} completed for niche {niche_id}")
-        return {"analysis_id": analysis.id, "status": analysis.status}
+        logger.info(f"Collection completed for niche {niche_id}: {result}")
+        return {"niche_id": niche_id, "status": "completed", **result}
 
     except Exception as exc:
-        logger.error(f"Analysis failed for niche {niche_id}: {exc}")
+        logger.error(f"Collection failed for niche {niche_id}: {exc}")
+
+        # Update task record with failure
+        if task_record:
+            task_record.status = "failed"
+            task_record.error_message = str(exc)[:500]
+            task_record.completed_at = datetime.now(timezone.utc)
+            db.commit()
+
         try:
             self.retry(exc=exc)
         except self.MaxRetriesExceededError:
@@ -38,8 +74,8 @@ def analyze_niche_trends(self, niche_id: int):
 
 
 @celery_app.task
-def run_scheduled_analyses():
-    from app.models import ScheduleConfig
+def run_scheduled_collections():
+    from app.models import CollectionTask, ScheduleConfig
 
     db = SessionLocal()
     try:
@@ -60,12 +96,40 @@ def run_scheduled_analyses():
                 should_run = elapsed >= config.interval_minutes
 
             if should_run:
-                analyze_niche_trends.delay(config.niche_id)
-                dispatched += 1
-                logger.info(f"Dispatched analysis for niche {config.niche_id}")
+                # Create task record first
+                task_record = CollectionTask(
+                    niche_id=config.niche_id,
+                    status="queued",
+                )
+                db.add(task_record)
+                db.commit()
+                db.refresh(task_record)
 
-        logger.info(f"Scheduled check complete: {dispatched} analyses dispatched")
+                collect_niche_trends.delay(config.niche_id, task_record.id)
+                dispatched += 1
+                logger.info(f"Dispatched collection for niche {config.niche_id}")
+
+        logger.info(f"Scheduled check complete: {dispatched} collections dispatched")
         return {"dispatched": dispatched}
 
+    finally:
+        db.close()
+
+
+@celery_app.task
+def cleanup_expired_trends():
+    from app.models import Trend
+
+    db = SessionLocal()
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        deleted = (
+            db.query(Trend)
+            .filter(Trend.status == "expired", Trend.expired_at < cutoff)
+            .delete()
+        )
+        db.commit()
+        logger.info(f"Cleanup: deleted {deleted} expired trends older than 30 days")
+        return {"deleted": deleted}
     finally:
         db.close()

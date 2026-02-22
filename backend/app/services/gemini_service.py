@@ -10,11 +10,16 @@ logger = logging.getLogger(__name__)
 GEMINI_MODEL = "gemini-3-flash-preview"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
-ANALYSIS_PROMPT = """You are an expert trend analyst. Analyze the following Reddit posts from various AI-related subreddits and identify the most significant trends.
+ANALYSIS_PROMPT = """You are an expert trend analyst. Analyze the following Reddit posts and identify the most significant trends.
+
+Each post includes a [type:hot] or [type:rising] tag indicating whether it came from a hot or rising endpoint. Use this to classify each trend:
+- "hot" = trend is well-established and widely discussed
+- "rising" = trend is emerging and gaining traction
 
 For each trend, provide:
 - title: A concise title for the trend
 - summary: A 2-3 sentence description of what this trend is about
+- trend_type: Either "hot" or "rising" based on the majority of source posts
 - sentiment: One of "positive", "negative", "neutral", or "mixed"
 - sentiment_score: A float from -1.0 (very negative) to 1.0 (very positive)
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
@@ -24,17 +29,15 @@ For each trend, provide:
 - mention_count: Estimated number of posts related to this trend
 - relevance_score: A float from 0.0 to 1.0 indicating how significant this trend is
 
-Also provide an overall_summary of the current AI landscape based on these posts (2-3 sentences).
-
 Identify between 5 and 15 trends, ordered by relevance_score (highest first).
 
 Return JSON in this exact format:
 {
-  "overall_summary": "string",
   "trends": [
     {
       "title": "string",
       "summary": "string",
+      "trend_type": "hot",
       "sentiment": "string",
       "sentiment_score": 0.0,
       "category": "string",
@@ -62,7 +65,8 @@ class GeminiService:
 
         posts_text = ""
         for p in sorted_posts:
-            posts_text += f"[id:{p['id']}] [r/{p['subreddit']}] (score: {p['score']}, comments: {p['num_comments']})\n"
+            trend_type = p.get("trend_type", "hot")
+            posts_text += f"[id:{p['id']}] [type:{trend_type}] [r/{p['subreddit']}] (score: {p['score']}, comments: {p['num_comments']})\n"
             posts_text += f"Title: {p['title']}\n"
             if p.get("selftext"):
                 posts_text += f"Text: {p['selftext'][:500]}\n"

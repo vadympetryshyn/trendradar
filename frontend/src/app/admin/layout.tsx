@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/trends", label: "Trends" },
   { href: "/admin/tasks", label: "Tasks" },
-  { href: "/admin/schedules", label: "Schedules" },
+  { href: "/admin/schedules", label: "Scheduler" },
 ];
 
 export default function AdminLayout({

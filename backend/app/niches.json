@@ -14,49 +14,5 @@
       "StableDiffusion",
       "Bard"
     ]
-  },
-  {
-    "name": "Web Development",
-    "slug": "webdev",
-    "subreddits": [
-      "webdev",
-      "javascript",
-      "reactjs",
-      "nextjs",
-      "node",
-      "typescript",
-      "frontend",
-      "css",
-      "tailwindcss",
-      "sveltejs"
-    ]
-  },
-  {
-    "name": "Crypto",
-    "slug": "crypto",
-    "subreddits": [
-      "CryptoCurrency",
-      "Bitcoin",
-      "ethereum",
-      "defi",
-      "solana",
-      "CryptoMarkets",
-      "altcoin",
-      "web3"
-    ]
-  },
-  {
-    "name": "Gaming",
-    "slug": "gaming",
-    "subreddits": [
-      "gaming",
-      "pcgaming",
-      "Games",
-      "IndieGaming",
-      "PS5",
-      "XboxSeriesX",
-      "NintendoSwitch",
-      "Steam"
-    ]
   }
 ]

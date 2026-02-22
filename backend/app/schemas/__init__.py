@@ -1,33 +1,40 @@
-from app.schemas.niche import NicheResponse
+from app.schemas.niche import NicheResponse, NicheDetailResponse
 from app.schemas.trend import (
-    TrendItemResponse,
-    TrendAnalysisResponse,
-    TrendAnalysisSummaryResponse,
-    PaginatedHistoryResponse,
+    TrendListItem,
+    TrendDetail,
+    TrendListResponse,
+    TrendSearchRequest,
+    TrendSearchResult,
+    TrendSearchResponse,
 )
-from app.schemas.schedule import ScheduleConfigCreate, ScheduleConfigResponse, ScheduleConfigUpdate
 from app.schemas.admin import (
+    NicheScheduleStatus,
+    SchedulerStatusResponse,
+    SchedulerStartRequest,
+    SchedulerRunRequest,
     ManualTriggerResponse,
-    TaskStatusResponse,
-    AnalysisListItem,
-    PaginatedAnalysesResponse,
-    TaskListItem,
-    PaginatedTasksResponse,
+    DashboardStatsResponse,
+)
+from app.schemas.task import (
+    CollectionTaskResponse,
+    CollectionTaskListResponse,
 )
 
 __all__ = [
     "NicheResponse",
-    "TrendItemResponse",
-    "TrendAnalysisResponse",
-    "TrendAnalysisSummaryResponse",
-    "PaginatedHistoryResponse",
-    "ScheduleConfigCreate",
-    "ScheduleConfigResponse",
-    "ScheduleConfigUpdate",
+    "NicheDetailResponse",
+    "TrendListItem",
+    "TrendDetail",
+    "TrendListResponse",
+    "TrendSearchRequest",
+    "TrendSearchResult",
+    "TrendSearchResponse",
+    "NicheScheduleStatus",
+    "SchedulerStatusResponse",
+    "SchedulerStartRequest",
+    "SchedulerRunRequest",
     "ManualTriggerResponse",
-    "TaskStatusResponse",
-    "AnalysisListItem",
-    "PaginatedAnalysesResponse",
-    "TaskListItem",
-    "PaginatedTasksResponse",
+    "DashboardStatsResponse",
+    "CollectionTaskResponse",
+    "CollectionTaskListResponse",
 ]

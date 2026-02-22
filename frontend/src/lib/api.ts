@@ -1,12 +1,14 @@
 import type {
   Niche,
-  TrendAnalysis,
-  PaginatedHistory,
-  PaginatedAnalyses,
-  PaginatedTasks,
+  TrendListResponse,
+  TrendDetail,
+  TrendSearchResponse,
+  SchedulerStatus,
   ManualTriggerResponse,
-  ScheduleConfig,
-  TaskStatus,
+  DashboardStats,
+  NicheScheduleStatus,
+  CollectionTask,
+  CollectionTaskList,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3006";
@@ -26,107 +28,132 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// ── Niches ──────────────────────────────────────────────────────────
+
 export function getNiches(): Promise<Niche[]> {
   return fetchApi("/api/v1/niches");
 }
 
-export function getLatestTrends(nicheSlug: string): Promise<TrendAnalysis> {
-  return fetchApi(`/api/v1/trends/${nicheSlug}`);
+// ── Trends ──────────────────────────────────────────────────────────
+
+export function getTrends(params?: {
+  niche_id?: number;
+  trend_type?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<TrendListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.niche_id) searchParams.set("niche_id", String(params.niche_id));
+  if (params?.trend_type) searchParams.set("trend_type", params.trend_type);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.offset) searchParams.set("offset", String(params.offset));
+  const qs = searchParams.toString();
+  return fetchApi(`/api/v1/trends${qs ? `?${qs}` : ""}`);
 }
 
-export function getAnalysisHistory(
-  nicheSlug: string,
-  page = 1,
-  perPage = 10
-): Promise<PaginatedHistory> {
-  return fetchApi(
-    `/api/v1/trends/${nicheSlug}/history?page=${page}&per_page=${perPage}`
-  );
+export function getTrend(id: string): Promise<TrendDetail> {
+  return fetchApi(`/api/v1/trends/${id}`);
 }
 
-export function triggerAnalysis(
-  nicheSlug: string
-): Promise<ManualTriggerResponse> {
-  return fetchApi(`/api/v1/admin/analyze/${nicheSlug}`, { method: "POST" });
-}
-
-export function getTaskStatus(taskId: string): Promise<TaskStatus> {
-  return fetchApi(`/api/v1/admin/task/${taskId}/status`);
-}
-
-export function triggerAllAnalyses(): Promise<{
-  triggered: number;
-  tasks: { task_id: string; niche_slug: string; niche_name: string }[];
-}> {
-  return fetchApi("/api/v1/admin/analyze-all", { method: "POST" });
-}
-
-export function stopTask(taskId: string): Promise<{ detail: string }> {
-  return fetchApi(`/api/v1/admin/task/${taskId}/stop`, { method: "POST" });
-}
-
-export function stopAllTasks(): Promise<{ detail: string; stopped: number }> {
-  return fetchApi("/api/v1/admin/tasks/stop-all", { method: "POST" });
-}
-
-export function getSchedules(): Promise<ScheduleConfig[]> {
-  return fetchApi("/api/v1/admin/schedules");
-}
-
-export function createSchedule(data: {
-  niche_id: number;
-  interval_minutes?: number;
-  is_enabled?: boolean;
-}): Promise<ScheduleConfig> {
-  return fetchApi("/api/v1/admin/schedules", {
+export function searchTrends(
+  query: string,
+  nicheId?: number,
+  limit?: number
+): Promise<TrendSearchResponse> {
+  return fetchApi("/api/v1/trends/search", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      query,
+      niche_id: nicheId,
+      limit: limit || 10,
+    }),
   });
 }
 
-export function updateSchedule(
-  scheduleId: number,
-  data: { interval_minutes?: number; is_enabled?: boolean }
-): Promise<ScheduleConfig> {
-  return fetchApi(`/api/v1/admin/schedules/${scheduleId}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
+export function getRecommended(
+  description: string,
+  limit?: number
+): Promise<TrendSearchResponse> {
+  const params = new URLSearchParams({
+    description,
+    limit: String(limit || 5),
+  });
+  return fetchApi(`/api/v1/trends/recommended?${params}`);
+}
+
+// ── Scheduler ───────────────────────────────────────────────────────
+
+export function getSchedulerStatus(): Promise<SchedulerStatus> {
+  return fetchApi("/api/v1/admin/scheduler/status");
+}
+
+export function startScheduler(
+  intervalMinutes: number
+): Promise<SchedulerStatus> {
+  return fetchApi("/api/v1/admin/scheduler/start", {
+    method: "POST",
+    body: JSON.stringify({ interval_minutes: intervalMinutes }),
   });
 }
 
-export function deleteSchedule(scheduleId: number): Promise<{ detail: string }> {
-  return fetchApi(`/api/v1/admin/schedules/${scheduleId}`, {
-    method: "DELETE",
+export function stopScheduler(): Promise<SchedulerStatus> {
+  return fetchApi("/api/v1/admin/scheduler/stop", { method: "POST" });
+}
+
+export function runNow(nicheId?: number): Promise<ManualTriggerResponse> {
+  return fetchApi("/api/v1/admin/scheduler/run", {
+    method: "POST",
+    body: JSON.stringify({ niche_id: nicheId || null }),
   });
 }
 
-export function getAnalysisById(id: number): Promise<TrendAnalysis> {
-  return fetchApi(`/api/v1/admin/analyses/${id}`);
+export function startNicheSchedule(
+  nicheId: number
+): Promise<NicheScheduleStatus> {
+  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/start`, {
+    method: "POST",
+  });
 }
 
-export function getAnalyses(
+export function stopNicheSchedule(
+  nicheId: number
+): Promise<NicheScheduleStatus> {
+  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/stop`, {
+    method: "POST",
+  });
+}
+
+// ── Tasks ───────────────────────────────────────────────────────────
+
+export function getCollectionTasks(
   page = 1,
   perPage = 20,
   status?: string
-): Promise<PaginatedAnalyses> {
+): Promise<CollectionTaskList> {
   const params = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
   });
   if (status) params.set("status", status);
-  return fetchApi(`/api/v1/admin/analyses?${params}`);
+  return fetchApi(`/api/v1/admin/tasks?${params}`);
 }
 
-export function getTasks(page = 1, perPage = 20): Promise<PaginatedTasks> {
-  return fetchApi(
-    `/api/v1/admin/tasks?page=${page}&per_page=${perPage}`
-  );
+export function getCollectionTask(id: number): Promise<CollectionTask> {
+  return fetchApi(`/api/v1/admin/tasks/${id}`);
 }
 
-export function deleteAnalysis(id: number): Promise<{ detail: string }> {
-  return fetchApi(`/api/v1/admin/analyses/${id}`, { method: "DELETE" });
+export function stopCollectionTask(id: number): Promise<CollectionTask> {
+  return fetchApi(`/api/v1/admin/tasks/${id}/stop`, { method: "POST" });
 }
 
-export function deleteTask(id: number): Promise<{ detail: string }> {
+export function deleteCollectionTask(
+  id: number
+): Promise<{ detail: string }> {
   return fetchApi(`/api/v1/admin/tasks/${id}`, { method: "DELETE" });
+}
+
+// ── Stats ───────────────────────────────────────────────────────────
+
+export function getDashboardStats(): Promise<DashboardStats> {
+  return fetchApi("/api/v1/admin/stats");
 }

@@ -19,5 +19,5 @@ class Niche(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
-    analyses = relationship("TrendAnalysis", back_populates="niche")
+    trends = relationship("Trend", back_populates="niche")
     schedule_configs = relationship("ScheduleConfig", back_populates="niche")

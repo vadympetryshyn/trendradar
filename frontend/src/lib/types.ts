@@ -7,10 +7,13 @@ export interface Niche {
   created_at: string;
 }
 
-export interface TrendItem {
-  id: number;
+export interface Trend {
+  id: string;
+  niche_id: number;
   title: string;
   summary: string;
+  trend_type: "hot" | "rising";
+  status: "active" | "expired";
   sentiment: string;
   sentiment_score: number;
   category: string;
@@ -19,106 +22,86 @@ export interface TrendItem {
   source_subreddits: string[];
   mention_count: number;
   relevance_score: number;
+  research_done: boolean;
+  has_embedding: boolean;
+  collected_at: string;
 }
 
-export interface TrendAnalysis {
-  id: number;
-  niche_id: number;
-  status: string;
-  overall_summary: string | null;
-  posts_fetched: number;
-  subreddits_fetched: number;
-  error_message: string | null;
-  started_at: string;
-  completed_at: string | null;
-  trend_items: TrendItem[];
+export interface TrendDetail extends Trend {
+  context_summary: string | null;
+  researched_at: string | null;
+  expired_at: string | null;
 }
 
-export interface TrendAnalysisSummary {
-  id: number;
-  niche_id: number;
-  status: string;
-  overall_summary: string | null;
-  posts_fetched: number;
-  subreddits_fetched: number;
-  error_message: string | null;
-  started_at: string;
-  completed_at: string | null;
-}
-
-export interface PaginatedHistory {
-  items: TrendAnalysisSummary[];
+export interface TrendListResponse {
+  items: Trend[];
   total: number;
-  page: number;
-  per_page: number;
+  limit: number;
+  offset: number;
 }
 
-export interface ScheduleConfig {
-  id: number;
+export interface TrendSearchResult {
+  id: string;
+  title: string;
+  summary: string;
+  trend_type: string;
+  sentiment: string;
+  category: string;
+  relevance_score: number;
+  similarity: number;
+}
+
+export interface TrendSearchResponse {
+  results: TrendSearchResult[];
+  query: string;
+}
+
+export interface NicheScheduleStatus {
   niche_id: number;
-  niche_name: string | null;
-  niche_slug: string | null;
-  interval_minutes: number;
+  niche_name: string;
+  niche_slug: string;
   is_enabled: boolean;
+  interval_minutes: number;
   last_run_at: string | null;
   next_run_at: string | null;
-  updated_at: string;
+  trend_count: number;
+}
+
+export interface SchedulerStatus {
+  running: boolean;
+  niches: NicheScheduleStatus[];
+}
+
+export interface DashboardStats {
+  active_trends: number;
+  expired_trends: number;
+  researched_trends: number;
+  embedded_trends: number;
+  total_niches: number;
 }
 
 export interface ManualTriggerResponse {
-  task_id: string;
   message: string;
-  niche_slug: string;
+  niche_id: number | null;
+  niche_name: string | null;
 }
 
-export interface TaskStatus {
-  task_id: string;
-  status: string;
-  analysis_id: number | null;
-  posts_fetched: number;
-  subreddits_fetched: number;
-  error_message: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-}
-
-export interface AnalysisListItem {
+export interface CollectionTask {
   id: number;
+  niche_id: number;
   niche_name: string;
   niche_slug: string;
-  status: string;
-  overall_summary: string | null;
-  posts_fetched: number;
-  subreddits_fetched: number;
-  error_message: string | null;
   celery_task_id: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  trend_items_count: number;
-}
-
-export interface PaginatedAnalyses {
-  items: AnalysisListItem[];
-  total: number;
-  page: number;
-  per_page: number;
-}
-
-export interface TaskListItem {
-  id: number;
-  celery_task_id: string | null;
-  niche_name: string;
-  niche_slug: string;
-  status: string;
-  posts_fetched: number;
-  subreddits_fetched: number;
+  status: "queued" | "running" | "completed" | "failed" | "stopped";
+  trends_created: number;
+  trends_expired: number;
   error_message: string | null;
-  started_at: string | null;
+  started_at: string;
   completed_at: string | null;
 }
 
-export interface PaginatedTasks {
-  items: TaskListItem[];
+export interface CollectionTaskList {
+  items: CollectionTask[];
   total: number;
   page: number;
   per_page: number;

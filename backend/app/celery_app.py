@@ -15,8 +15,12 @@ celery_app.autodiscover_tasks(["app.tasks"])
 
 celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {
-    "check-scheduled-analyses": {
-        "task": "app.tasks.run_scheduled_analyses",
-        "schedule": 300.0,  # every 5 minutes
+    "check-scheduled-collections": {
+        "task": "app.tasks.run_scheduled_collections",
+        "schedule": 300.0,
+    },
+    "cleanup-expired-trends": {
+        "task": "app.tasks.cleanup_expired_trends",
+        "schedule": 86400.0,
     },
 }

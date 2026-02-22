@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Square, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -22,51 +23,61 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  getTasks,
-  deleteTask,
-  triggerAllAnalyses,
-  stopTask,
-  stopAllTasks,
+  getCollectionTasks,
+  stopCollectionTask,
+  deleteCollectionTask,
+  runNow,
 } from "@/lib/api";
-import type { TaskListItem } from "@/lib/types";
-import { StatusBadge } from "../_components/status-badge";
+import type { CollectionTask } from "@/lib/types";
 
-const IN_PROGRESS_STATUSES = ["pending", "queued", "fetching", "analyzing"];
+const STATUS_COLORS: Record<string, string> = {
+  queued: "bg-gray-100 text-gray-700",
+  running: "bg-blue-100 text-blue-700",
+  completed: "bg-green-100 text-green-700",
+  failed: "bg-red-100 text-red-700",
+  stopped: "bg-yellow-100 text-yellow-700",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  queued: "Queued",
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+  stopped: "Stopped",
+};
+
+const IN_PROGRESS = ["queued", "running"];
 
 export default function TasksPage() {
-  const [items, setItems] = useState<TaskListItem[]>([]);
+  const [tasks, setTasks] = useState<CollectionTask[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [stoppingId, setStoppingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [stoppingId, setStoppingId] = useState<string | null>(null);
-  const [runningAll, setRunningAll] = useState(false);
-  const [stoppingAll, setStoppingAll] = useState(false);
+  const [triggeringAll, setTriggeringAll] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const perPage = 20;
 
-  const fetchData = useCallback(() => {
-    return getTasks(page, perPage).then((data) => {
-      setItems(data.items);
+  const fetchTasks = useCallback(() => {
+    return getCollectionTasks(page, perPage, statusFilter).then((data) => {
+      setTasks(data.items);
       setTotal(data.total);
     });
-  }, [page]);
+  }, [page, statusFilter]);
 
   useEffect(() => {
     setLoading(true);
-    fetchData().finally(() => setLoading(false));
-  }, [fetchData]);
+    fetchTasks().finally(() => setLoading(false));
+  }, [fetchTasks]);
 
   // Auto-refresh while there are in-progress tasks
-  const hasInProgress = items.some((i) =>
-    IN_PROGRESS_STATUSES.includes(i.status)
-  );
+  const hasInProgress = tasks.some((t) => IN_PROGRESS.includes(t.status));
 
   useEffect(() => {
     if (hasInProgress) {
-      pollRef.current = setInterval(() => {
-        fetchData();
-      }, 3000);
+      pollRef.current = setInterval(fetchTasks, 3000);
     }
     return () => {
       if (pollRef.current) {
@@ -74,13 +85,25 @@ export default function TasksPage() {
         pollRef.current = null;
       }
     };
-  }, [hasInProgress, fetchData]);
+  }, [hasInProgress, fetchTasks]);
+
+  const handleStop = async (id: number) => {
+    setStoppingId(id);
+    try {
+      await stopCollectionTask(id);
+      await fetchTasks();
+    } catch {
+      alert("Failed to stop task");
+    } finally {
+      setStoppingId(null);
+    }
+  };
 
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     try {
-      await deleteTask(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      await deleteCollectionTask(id);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
       setTotal((prev) => prev - 1);
     } catch {
       alert("Failed to delete task");
@@ -89,45 +112,21 @@ export default function TasksPage() {
     }
   };
 
-  const handleStop = async (celeryTaskId: string) => {
-    setStoppingId(celeryTaskId);
-    try {
-      await stopTask(celeryTaskId);
-      await fetchData();
-    } catch {
-      alert("Failed to stop task");
-    } finally {
-      setStoppingId(null);
-    }
-  };
-
   const handleRunAll = async () => {
-    setRunningAll(true);
+    setTriggeringAll(true);
     try {
-      await triggerAllAnalyses();
-      await fetchData();
+      await runNow();
+      await fetchTasks();
     } catch {
-      alert("Failed to trigger analyses");
+      alert("Failed to trigger collection");
     } finally {
-      setRunningAll(false);
-    }
-  };
-
-  const handleStopAll = async () => {
-    setStoppingAll(true);
-    try {
-      await stopAllTasks();
-      await fetchData();
-    } catch {
-      alert("Failed to stop tasks");
-    } finally {
-      setStoppingAll(false);
+      setTriggeringAll(false);
     }
   };
 
   const totalPages = Math.ceil(total / perPage);
 
-  if (loading && items.length === 0) {
+  if (loading && tasks.length === 0) {
     return (
       <div className="py-8 text-center text-muted-foreground">Loading...</div>
     );
@@ -139,31 +138,39 @@ export default function TasksPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
           <p className="text-muted-foreground mt-1">
-            All analysis tasks with statuses
+            Collection task history and status
           </p>
         </div>
-        <div className="flex gap-2">
-          {hasInProgress && (
-            <Button
-              variant="destructive"
-              onClick={handleStopAll}
-              disabled={stoppingAll}
+        <Button onClick={handleRunAll} disabled={triggeringAll}>
+          {triggeringAll ? "Triggering..." : "Run Now"}
+        </Button>
+      </div>
+
+      {/* Status filter */}
+      <div className="flex gap-2">
+        {[undefined, "queued", "running", "completed", "failed", "stopped"].map(
+          (s) => (
+            <Badge
+              key={s ?? "all"}
+              variant={statusFilter === s ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => {
+                setStatusFilter(s);
+                setPage(1);
+              }}
             >
-              {stoppingAll ? "Stopping..." : "Stop All"}
-            </Button>
-          )}
-          <Button onClick={handleRunAll} disabled={runningAll}>
-            {runningAll ? "Starting..." : "Run All"}
-          </Button>
-        </div>
+              {s ? STATUS_LABELS[s] || s : "All"}
+            </Badge>
+          )
+        )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Analysis Tasks</CardTitle>
+          <CardTitle>Collection Tasks</CardTitle>
           <CardDescription>
-            {total} total task{total === 1 ? "" : "s"}
-            {hasInProgress && " · auto-refreshing"}
+            {total} task{total !== 1 ? "s" : ""}
+            {hasInProgress && " \u00b7 auto-refreshing"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -172,12 +179,13 @@ export default function TasksPage() {
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="pb-2 pr-4 font-medium w-10">#</th>
-                  <th className="pb-2 pr-4 font-medium">Task ID</th>
                   <th className="pb-2 pr-4 font-medium">Niche</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
-                  <th className="pb-2 pr-4 font-medium text-right">Posts</th>
                   <th className="pb-2 pr-4 font-medium text-right">
-                    Subreddits
+                    Created
+                  </th>
+                  <th className="pb-2 pr-4 font-medium text-right">
+                    Expired
                   </th>
                   <th className="pb-2 pr-4 font-medium">Error</th>
                   <th className="pb-2 pr-4 font-medium">Started</th>
@@ -186,72 +194,70 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, index) => {
-                  const isInProgress = IN_PROGRESS_STATUSES.includes(
-                    item.status
-                  );
-
+                {tasks.map((task, index) => {
+                  const isActive = IN_PROGRESS.includes(task.status);
                   return (
-                    <tr key={item.id} className="border-b last:border-0">
+                    <tr key={task.id} className="border-b last:border-0">
                       <td className="py-3 pr-4 text-muted-foreground tabular-nums">
-                        {(page - 1) * perPage + index + 1}
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        {item.celery_task_id
-                          ? item.celery_task_id.slice(0, 8)
-                          : "—"}
+                        {task.id}
                       </td>
                       <td className="py-3 pr-4 font-medium">
-                        {item.niche_name}
+                        {task.niche_name}
                       </td>
                       <td className="py-3 pr-4">
-                        <StatusBadge status={item.status} />
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[task.status] || "bg-gray-100 text-gray-700"}`}
+                        >
+                          {isActive && (
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-current" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
+                            </span>
+                          )}
+                          {STATUS_LABELS[task.status] || task.status}
+                        </span>
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums">
-                        {item.posts_fetched}
+                        {task.trends_created}
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums">
-                        {item.subreddits_fetched}
+                        {task.trends_expired}
                       </td>
                       <td className="py-3 pr-4 max-w-[200px] truncate text-red-500">
-                        {item.error_message || "—"}
+                        {task.error_message || "\u2014"}
                       </td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        {item.started_at
-                          ? new Date(item.started_at).toLocaleString()
-                          : "—"}
+                      <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                        {new Date(task.started_at).toLocaleString()}
                       </td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        {item.completed_at
-                          ? new Date(item.completed_at).toLocaleString()
-                          : "—"}
+                      <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                        {task.completed_at
+                          ? new Date(task.completed_at).toLocaleString()
+                          : "\u2014"}
                       </td>
                       <td className="py-3">
                         <div className="flex gap-1">
-                          {isInProgress && item.celery_task_id && (
+                          {isActive && (
                             <Button
-                              size="icon-xs"
+                              size="icon"
                               variant="ghost"
-                              disabled={stoppingId === item.celery_task_id}
-                              onClick={() =>
-                                handleStop(item.celery_task_id!)
-                              }
-                              className="text-muted-foreground hover:text-orange-600"
+                              disabled={stoppingId === task.id}
+                              onClick={() => handleStop(task.id)}
+                              className="h-7 w-7 text-muted-foreground hover:text-orange-600"
                               title="Stop task"
                             >
-                              <Square />
+                              <Square className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
-                                size="icon-xs"
+                                size="icon"
                                 variant="ghost"
-                                disabled={deletingId === item.id}
-                                className="text-muted-foreground hover:text-destructive"
+                                disabled={deletingId === task.id}
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                 title="Delete task"
                               >
-                                <Trash2 />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -260,16 +266,14 @@ export default function TasksPage() {
                                   Delete task
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will permanently delete this task and its
-                                  associated analysis data. This action cannot be
-                                  undone.
+                                  Permanently delete this task record? If the
+                                  task is running, it will be stopped first.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => handleDelete(item.id)}
+                                  onClick={() => handleDelete(task.id)}
                                 >
                                   Delete
                                 </AlertDialogAction>
@@ -281,10 +285,10 @@ export default function TasksPage() {
                     </tr>
                   );
                 })}
-                {items.length === 0 && (
+                {tasks.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={9}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No tasks found.

@@ -1,6 +1,6 @@
 from app.models.niche import Niche
-from app.models.trend_analysis import TrendAnalysis
-from app.models.trend_item import TrendItem
+from app.models.trend import Trend
 from app.models.schedule_config import ScheduleConfig
+from app.models.collection_task import CollectionTask
 
-__all__ = ["Niche", "TrendAnalysis", "TrendItem", "ScheduleConfig"]
+__all__ = ["Niche", "Trend", "ScheduleConfig", "CollectionTask"]

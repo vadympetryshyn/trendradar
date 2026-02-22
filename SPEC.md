@@ -11,7 +11,7 @@ TrendsRadar has **no knowledge of Postory users**. Personalization (matching tre
 ## Data Sources
 
 - **Reddit** public JSON endpoints (no API key required)
-- **Web search** (Serper/Brave) for on-demand trend enrichment
+- **Web search** (Perplexity 5 results) for on-demand trend enrichment
 
 ## Niches
 
@@ -32,12 +32,12 @@ For each niche, we scrape **two Reddit feeds per subreddit**:
 - **Hot** — currently popular posts
 - **Rising** — posts gaining traction quickly
 
-Each trend must be tagged with `source: "hot" | "rising"` to indicate where it was found.
+Each trend must be tagged with `trnd type: "hot" | "rising"` to indicate where it was found.
 
 ### Scheduling
 
 - Default interval: **every 30 minutes**, all niches, both hot and rising
-- Configurable interval via admin UI (dropdown: 15min / 30min / 1h / 2h)
+- Configurable interval via admin UI (dropdown: 15min / 30min / 1h / 2h / 5h / 12h/ 24h)
 - Admin can:
   - Start/stop the global scheduler
   - Trigger a manual run (all niches)
@@ -51,7 +51,7 @@ Before inserting new trends from a scrape:
 2. Insert new trends as `active`
 3. Trends that appear in consecutive scrapes should be **deduplicated** by `reddit_post_id` — update metrics (upvotes, comments) instead of creating duplicates
 
-Expired trends are kept for **72 hours**, then deleted by a cleanup job.
+Expired trends are kept for **30 days**, then deleted by a cleanup job.
 
 ---
 
@@ -64,14 +64,14 @@ Trend:
   title: string
   subreddit: string
   niche_id: string
-  source: "hot" | "rising"
+  trend_type: "hot" | "rising"
   status: "active" | "expired"
   url: string (link to Reddit post)
   upvotes: int
   comment_count: int
   
   # Web research (populated on demand)
-  context_summary: text | null (web research result, 500-1000 words)
+  context_summary: text | null (web research result up to 3000 symbols)
   research_done: boolean (default false)
   researched_at: timestamp | null
   
@@ -143,7 +143,7 @@ List active trends with filters.
 
 Query params:
 - `niche_id` (optional) — filter by niche
-- `source` (optional) — `"hot"` | `"rising"`
+- `trend_type` (optional) — `"hot"` | `"rising"`
 - `limit` (default 20, max 100)
 - `offset` (default 0)
 
@@ -163,8 +163,8 @@ Body:
 ```json
 {
   "query": "seasonal allergies in children",
-  "niche_id": "ai",           // optional, filter by niche
-  "source": "hot",             // optional
+  "niche_slug": "ai",           // optional, filter by niche
+  "trend_type": "hot",             // optional
   "limit": 10
 }
 ```
@@ -178,7 +178,7 @@ Get trends recommended based on a text description (used by Postory to pass user
 
 Query params:
 - `description` — free-text niche description (e.g., "AI tools for developers")
-- `source` (optional) — `"hot"` | `"rising"`
+- `trend_type` (optional) — `"hot"` | `"rising"`
 - `limit` (default 10)
 
 Backend generates embedding from `description`, same as search but framed as recommendations.
@@ -242,7 +242,7 @@ TrendsRadar must have a **web-based admin UI** (not just API). This is for devel
 
 #### Trends Browser
 - Table/list of all trends
-- Filters: niche, source (hot/rising), status (active/expired), researched (yes/no)
+- Filters: niche, trend type (hot/rising), status (active/expired), researched (yes/no)
 - Search bar (text search by title)
 - Click on trend → detail view with full context_summary
 - Button to manually trigger web research for a trend

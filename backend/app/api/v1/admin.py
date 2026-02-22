@@ -5,276 +5,285 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Niche, ScheduleConfig, TrendAnalysis
+from app.models import CollectionTask, Niche, ScheduleConfig, Trend
 from app.schemas import (
-    AnalysisListItem,
+    CollectionTaskListResponse,
+    CollectionTaskResponse,
+    DashboardStatsResponse,
     ManualTriggerResponse,
-    PaginatedAnalysesResponse,
-    PaginatedTasksResponse,
-    ScheduleConfigCreate,
-    ScheduleConfigResponse,
-    ScheduleConfigUpdate,
-    TaskListItem,
-    TaskStatusResponse,
-    TrendAnalysisResponse,
+    NicheScheduleStatus,
+    SchedulerRunRequest,
+    SchedulerStartRequest,
+    SchedulerStatusResponse,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _schedule_to_response(config: ScheduleConfig) -> ScheduleConfigResponse:
-    data = ScheduleConfigResponse.model_validate(config)
-    data.next_run_at = config.next_run_at
-    if config.niche:
-        data.niche_name = config.niche.name
-        data.niche_slug = config.niche.slug
-    return data
-
-
-@router.post("/analyze/{niche_slug}", response_model=ManualTriggerResponse)
-def trigger_analysis(niche_slug: str, db: Session = Depends(get_db)):
-    niche = db.query(Niche).filter(Niche.slug == niche_slug, Niche.is_active.is_(True)).first()
-    if not niche:
-        raise HTTPException(status_code=404, detail="Niche not found")
-
-    from app.tasks import analyze_niche_trends
-
-    result = analyze_niche_trends.delay(niche.id)
-
-    return ManualTriggerResponse(
-        task_id=result.id,
-        message=f"Analysis triggered for niche '{niche.name}'",
-        niche_slug=niche_slug,
+def _task_to_response(task: CollectionTask) -> CollectionTaskResponse:
+    niche = task.niche
+    return CollectionTaskResponse(
+        id=task.id,
+        niche_id=task.niche_id,
+        niche_name=niche.name if niche else f"Niche #{task.niche_id}",
+        niche_slug=niche.slug if niche else "",
+        celery_task_id=task.celery_task_id,
+        status=task.status,
+        trends_created=task.trends_created,
+        trends_expired=task.trends_expired,
+        error_message=task.error_message,
+        started_at=task.started_at,
+        completed_at=task.completed_at,
     )
 
 
-@router.post("/analyze-all")
-def trigger_all_analyses(db: Session = Depends(get_db)):
+# ── Scheduler endpoints ──────────────────────────────────────────────
+
+
+@router.get("/scheduler/status", response_model=SchedulerStatusResponse)
+def get_scheduler_status(db: Session = Depends(get_db)):
+    configs = (
+        db.query(ScheduleConfig)
+        .join(Niche)
+        .filter(Niche.is_active.is_(True))
+        .all()
+    )
+    any_running = any(c.is_enabled for c in configs)
+
+    niches_status = []
+    for config in configs:
+        niche = config.niche
+        trend_count = (
+            db.query(func.count(Trend.id))
+            .filter(Trend.niche_id == config.niche_id, Trend.status == "active")
+            .scalar()
+        )
+        niches_status.append(NicheScheduleStatus(
+            niche_id=config.niche_id,
+            niche_name=niche.name if niche else f"Niche #{config.niche_id}",
+            niche_slug=niche.slug if niche else "",
+            is_enabled=config.is_enabled,
+            interval_minutes=config.interval_minutes,
+            last_run_at=config.last_run_at,
+            next_run_at=config.next_run_at,
+            trend_count=trend_count,
+        ))
+
+    return SchedulerStatusResponse(running=any_running, niches=niches_status)
+
+
+@router.post("/scheduler/start", response_model=SchedulerStatusResponse)
+def start_scheduler(
+    request: SchedulerStartRequest,
+    db: Session = Depends(get_db),
+):
+    configs = db.query(ScheduleConfig).join(Niche).filter(Niche.is_active.is_(True)).all()
+    for config in configs:
+        config.is_enabled = True
+        config.interval_minutes = request.interval_minutes
+        config.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return get_scheduler_status(db)
+
+
+@router.post("/scheduler/stop", response_model=SchedulerStatusResponse)
+def stop_scheduler(db: Session = Depends(get_db)):
+    configs = db.query(ScheduleConfig).join(Niche).filter(Niche.is_active.is_(True)).all()
+    for config in configs:
+        config.is_enabled = False
+        config.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return get_scheduler_status(db)
+
+
+@router.post("/scheduler/run", response_model=ManualTriggerResponse)
+def manual_run(
+    request: SchedulerRunRequest = SchedulerRunRequest(),
+    db: Session = Depends(get_db),
+):
+    from app.tasks import collect_niche_trends
+
+    if request.niche_id is not None:
+        niche = db.query(Niche).filter(Niche.id == request.niche_id).first()
+        if not niche:
+            raise HTTPException(status_code=404, detail="Niche not found")
+
+        task_record = CollectionTask(niche_id=niche.id, status="queued")
+        db.add(task_record)
+        db.commit()
+        db.refresh(task_record)
+
+        collect_niche_trends.delay(niche.id, task_record.id)
+        return ManualTriggerResponse(
+            message=f"Collection triggered for '{niche.name}'",
+            niche_id=niche.id,
+            niche_name=niche.name,
+        )
+
     niches = db.query(Niche).filter(Niche.is_active.is_(True)).all()
     if not niches:
         raise HTTPException(status_code=404, detail="No active niches found")
 
-    from app.tasks import analyze_niche_trends
-
-    results = []
     for niche in niches:
-        result = analyze_niche_trends.delay(niche.id)
-        results.append({
-            "task_id": result.id,
-            "niche_slug": niche.slug,
-            "niche_name": niche.name,
-        })
-    return {"triggered": len(results), "tasks": results}
-
-
-@router.post("/task/{task_id}/stop")
-def stop_task(task_id: str, db: Session = Depends(get_db)):
-    from app.celery_app import celery_app
-
-    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
-
-    analysis = db.query(TrendAnalysis).filter(TrendAnalysis.celery_task_id == task_id).first()
-    if analysis and analysis.status in ("pending", "queued", "fetching", "analyzing"):
-        db.delete(analysis)
+        task_record = CollectionTask(niche_id=niche.id, status="queued")
+        db.add(task_record)
         db.commit()
+        db.refresh(task_record)
+        collect_niche_trends.delay(niche.id, task_record.id)
 
-    return {"detail": "Task stopped and cleaned up", "task_id": task_id}
-
-
-@router.post("/tasks/stop-all")
-def stop_all_tasks(db: Session = Depends(get_db)):
-    from app.celery_app import celery_app
-
-    active_analyses = (
-        db.query(TrendAnalysis)
-        .filter(TrendAnalysis.status.in_(["pending", "queued", "fetching", "analyzing"]))
-        .all()
-    )
-
-    stopped = 0
-    for analysis in active_analyses:
-        if analysis.celery_task_id:
-            celery_app.control.revoke(analysis.celery_task_id, terminate=True, signal="SIGTERM")
-        db.delete(analysis)
-        stopped += 1
-
-    db.commit()
-    return {"detail": f"Stopped {stopped} tasks", "stopped": stopped}
-
-
-@router.get("/task/{task_id}/status", response_model=TaskStatusResponse)
-def get_task_status(task_id: str, db: Session = Depends(get_db)):
-    analysis = db.query(TrendAnalysis).filter(TrendAnalysis.celery_task_id == task_id).first()
-    if analysis:
-        return TaskStatusResponse(
-            task_id=task_id,
-            status=analysis.status,
-            analysis_id=analysis.id,
-            posts_fetched=analysis.posts_fetched,
-            subreddits_fetched=analysis.subreddits_fetched,
-            error_message=analysis.error_message,
-            started_at=analysis.started_at,
-            completed_at=analysis.completed_at,
-        )
-
-    from app.celery_app import celery_app
-
-    result = celery_app.AsyncResult(task_id)
-    celery_state = result.state if result.state else "PENDING"
-    status_map = {"PENDING": "queued", "STARTED": "pending", "RETRY": "pending"}
-    return TaskStatusResponse(
-        task_id=task_id,
-        status=status_map.get(celery_state, "queued"),
+    return ManualTriggerResponse(
+        message=f"Collection triggered for {len(niches)} niches",
     )
 
 
-@router.get("/schedules", response_model=list[ScheduleConfigResponse])
-def list_schedules(db: Session = Depends(get_db)):
-    configs = db.query(ScheduleConfig).all()
-    return [_schedule_to_response(config) for config in configs]
-
-
-@router.post("/schedules", response_model=ScheduleConfigResponse, status_code=201)
-def create_schedule(payload: ScheduleConfigCreate, db: Session = Depends(get_db)):
-    niche = db.query(Niche).filter(Niche.id == payload.niche_id).first()
-    if not niche:
-        raise HTTPException(status_code=404, detail="Niche not found")
-
-    config = ScheduleConfig(
-        niche_id=payload.niche_id,
-        interval_minutes=payload.interval_minutes,
-        is_enabled=payload.is_enabled,
-        updated_at=datetime.now(timezone.utc),
-    )
-    db.add(config)
-    db.commit()
-    db.refresh(config)
-
-    return _schedule_to_response(config)
-
-
-@router.put("/schedules/{schedule_id}", response_model=ScheduleConfigResponse)
-def update_schedule(schedule_id: int, update: ScheduleConfigUpdate, db: Session = Depends(get_db)):
-    config = db.query(ScheduleConfig).filter(ScheduleConfig.id == schedule_id).first()
+@router.post("/scheduler/niche/{niche_id}/start", response_model=NicheScheduleStatus)
+def start_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
+    config = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == niche_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Schedule not found")
+        raise HTTPException(status_code=404, detail="Schedule not found for this niche")
 
-    if update.interval_minutes is not None:
-        config.interval_minutes = update.interval_minutes
-    if update.is_enabled is not None:
-        config.is_enabled = update.is_enabled
+    config.is_enabled = True
     config.updated_at = datetime.now(timezone.utc)
-
     db.commit()
     db.refresh(config)
 
-    return _schedule_to_response(config)
+    niche = config.niche
+    trend_count = (
+        db.query(func.count(Trend.id))
+        .filter(Trend.niche_id == niche_id, Trend.status == "active")
+        .scalar()
+    )
+
+    return NicheScheduleStatus(
+        niche_id=config.niche_id,
+        niche_name=niche.name if niche else "",
+        niche_slug=niche.slug if niche else "",
+        is_enabled=config.is_enabled,
+        interval_minutes=config.interval_minutes,
+        last_run_at=config.last_run_at,
+        next_run_at=config.next_run_at,
+        trend_count=trend_count,
+    )
 
 
-@router.delete("/schedules/{schedule_id}")
-def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
-    config = db.query(ScheduleConfig).filter(ScheduleConfig.id == schedule_id).first()
+@router.post("/scheduler/niche/{niche_id}/stop", response_model=NicheScheduleStatus)
+def stop_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
+    config = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == niche_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Schedule not found")
+        raise HTTPException(status_code=404, detail="Schedule not found for this niche")
 
-    db.delete(config)
+    config.is_enabled = False
+    config.updated_at = datetime.now(timezone.utc)
     db.commit()
-    return {"detail": "Schedule deleted"}
+    db.refresh(config)
+
+    niche = config.niche
+    trend_count = (
+        db.query(func.count(Trend.id))
+        .filter(Trend.niche_id == niche_id, Trend.status == "active")
+        .scalar()
+    )
+
+    return NicheScheduleStatus(
+        niche_id=config.niche_id,
+        niche_name=niche.name if niche else "",
+        niche_slug=niche.slug if niche else "",
+        is_enabled=config.is_enabled,
+        interval_minutes=config.interval_minutes,
+        last_run_at=config.last_run_at,
+        next_run_at=config.next_run_at,
+        trend_count=trend_count,
+    )
 
 
-@router.get("/analyses", response_model=PaginatedAnalysesResponse)
-def list_analyses(
+# ── Task endpoints ────────────────────────────────────────────────────
+
+
+@router.get("/tasks", response_model=CollectionTaskListResponse)
+def list_tasks(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(TrendAnalysis).join(Niche)
+    query = db.query(CollectionTask)
     if status:
-        query = query.filter(TrendAnalysis.status == status)
+        query = query.filter(CollectionTask.status == status)
     total = query.count()
-    analyses = (
-        query.order_by(TrendAnalysis.started_at.desc())
+    tasks = (
+        query.order_by(CollectionTask.started_at.desc())
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
     )
-    items = [
-        AnalysisListItem(
-            id=a.id,
-            niche_name=a.niche.name,
-            niche_slug=a.niche.slug,
-            status=a.status,
-            overall_summary=a.overall_summary,
-            posts_fetched=a.posts_fetched,
-            subreddits_fetched=a.subreddits_fetched,
-            error_message=a.error_message,
-            celery_task_id=a.celery_task_id,
-            started_at=a.started_at,
-            completed_at=a.completed_at,
-            trend_items_count=len(a.trend_items),
-        )
-        for a in analyses
-    ]
-    return PaginatedAnalysesResponse(items=items, total=total, page=page, per_page=per_page)
+    return CollectionTaskListResponse(
+        items=[_task_to_response(t) for t in tasks],
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
 
 
-@router.get("/analyses/{analysis_id}", response_model=TrendAnalysisResponse)
-def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
-    analysis = db.query(TrendAnalysis).filter(TrendAnalysis.id == analysis_id).first()
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    return analysis
+@router.get("/tasks/{task_id}", response_model=CollectionTaskResponse)
+def get_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _task_to_response(task)
 
 
-@router.delete("/analyses/{analysis_id}")
-def delete_analysis(analysis_id: int, db: Session = Depends(get_db)):
-    analysis = db.query(TrendAnalysis).filter(TrendAnalysis.id == analysis_id).first()
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    db.delete(analysis)
-    db.commit()
-    return {"detail": "Analysis deleted"}
+@router.post("/tasks/{task_id}/stop")
+def stop_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status in ("queued", "running"):
+        # Revoke celery task if possible
+        if task.celery_task_id:
+            from app.celery_app import celery_app
+            celery_app.control.revoke(task.celery_task_id, terminate=True, signal="SIGTERM")
+
+        task.status = "stopped"
+        task.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+    return _task_to_response(task)
 
 
 @router.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db)):
-    analysis = db.query(TrendAnalysis).filter(TrendAnalysis.id == task_id).first()
-    if not analysis:
+    task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(analysis)
+
+    # Stop if still running
+    if task.status in ("queued", "running") and task.celery_task_id:
+        from app.celery_app import celery_app
+        celery_app.control.revoke(task.celery_task_id, terminate=True, signal="SIGTERM")
+
+    db.delete(task)
     db.commit()
     return {"detail": "Task deleted"}
 
 
-@router.get("/tasks", response_model=PaginatedTasksResponse)
-def list_tasks(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    total = db.query(func.count(TrendAnalysis.id)).scalar()
-    analyses = (
-        db.query(TrendAnalysis)
-        .join(Niche)
-        .order_by(TrendAnalysis.started_at.desc())
-        .offset((page - 1) * per_page)
-        .limit(per_page)
-        .all()
+# ── Stats endpoint ────────────────────────────────────────────────────
+
+
+@router.get("/stats", response_model=DashboardStatsResponse)
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    active_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active").scalar()
+    expired_trends = db.query(func.count(Trend.id)).filter(Trend.status == "expired").scalar()
+    researched_trends = db.query(func.count(Trend.id)).filter(Trend.research_done.is_(True)).scalar()
+    embedded_trends = db.query(func.count(Trend.id)).filter(Trend.embedding.isnot(None)).scalar()
+    total_niches = db.query(func.count(Niche.id)).filter(Niche.is_active.is_(True)).scalar()
+
+    return DashboardStatsResponse(
+        active_trends=active_trends,
+        expired_trends=expired_trends,
+        researched_trends=researched_trends,
+        embedded_trends=embedded_trends,
+        total_niches=total_niches,
     )
-    items = [
-        TaskListItem(
-            id=a.id,
-            celery_task_id=a.celery_task_id,
-            niche_name=a.niche.name,
-            niche_slug=a.niche.slug,
-            status=a.status,
-            posts_fetched=a.posts_fetched,
-            subreddits_fetched=a.subreddits_fetched,
-            error_message=a.error_message,
-            started_at=a.started_at,
-            completed_at=a.completed_at,
-        )
-        for a in analyses
-    ]
-    return PaginatedTasksResponse(items=items, total=total, page=page, per_page=per_page)

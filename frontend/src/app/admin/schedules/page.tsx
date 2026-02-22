@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -11,17 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,92 +17,72 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  getNiches,
-  getSchedules,
-  createSchedule,
-  updateSchedule,
-  deleteSchedule,
+  getSchedulerStatus,
+  startScheduler,
+  stopScheduler,
+  startNicheSchedule,
+  stopNicheSchedule,
+  runNow,
 } from "@/lib/api";
-import type { Niche, ScheduleConfig } from "@/lib/types";
+import type { SchedulerStatus } from "@/lib/types";
 
-export default function SchedulesPage() {
-  const [schedules, setSchedules] = useState<ScheduleConfig[]>([]);
-  const [niches, setNiches] = useState<Niche[]>([]);
+const INTERVAL_OPTIONS = [
+  { label: "15 min", value: 15 },
+  { label: "30 min", value: 30 },
+  { label: "1 hour", value: 60 },
+  { label: "2 hours", value: 120 },
+  { label: "5 hours", value: 300 },
+  { label: "12 hours", value: 720 },
+  { label: "24 hours", value: 1440 },
+];
+
+export default function SchedulerPage() {
+  const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [createNicheId, setCreateNicheId] = useState<string>("");
-  const [createInterval, setCreateInterval] = useState(60);
-  const [creating, setCreating] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [selectedInterval, setSelectedInterval] = useState("60");
+  const [runningNiche, setRunningNiche] = useState<number | null>(null);
 
   useEffect(() => {
-    Promise.all([getSchedules(), getNiches()])
-      .then(([schedulesData, nichesData]) => {
-        setSchedules(schedulesData);
-        setNiches(nichesData);
-      })
+    getSchedulerStatus()
+      .then(setScheduler)
       .finally(() => setLoading(false));
   }, []);
 
-  const handleToggle = async (schedule: ScheduleConfig) => {
-    try {
-      const updated = await updateSchedule(schedule.id, {
-        is_enabled: !schedule.is_enabled,
-      });
-      setSchedules((prev) =>
-        prev.map((s) => (s.id === updated.id ? updated : s))
-      );
-    } catch {
-      alert("Failed to update schedule");
-    }
+  const handleStart = async () => {
+    const result = await startScheduler(parseInt(selectedInterval));
+    setScheduler(result);
   };
 
-  const handleIntervalChange = async (
-    schedule: ScheduleConfig,
-    value: number
-  ) => {
-    if (value < 15 || value > 1440) return;
-    try {
-      const updated = await updateSchedule(schedule.id, {
-        interval_minutes: value,
-      });
-      setSchedules((prev) =>
-        prev.map((s) => (s.id === updated.id ? updated : s))
-      );
-    } catch {
-      alert("Failed to update interval");
-    }
+  const handleStop = async () => {
+    const result = await stopScheduler();
+    setScheduler(result);
   };
 
-  const handleCreate = async () => {
-    if (!createNicheId) return;
-    setCreating(true);
+  const handleToggleNiche = async (nicheId: number, enabled: boolean) => {
+    const result = enabled
+      ? await stopNicheSchedule(nicheId)
+      : await startNicheSchedule(nicheId);
+
+    setScheduler((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        running: prev.niches.some(
+          (n) => (n.niche_id === nicheId ? result.is_enabled : n.is_enabled)
+        ),
+        niches: prev.niches.map((n) =>
+          n.niche_id === nicheId ? result : n
+        ),
+      };
+    });
+  };
+
+  const handleRunNiche = async (nicheId: number) => {
+    setRunningNiche(nicheId);
     try {
-      const created = await createSchedule({
-        niche_id: parseInt(createNicheId),
-        interval_minutes: createInterval,
-        is_enabled: true,
-      });
-      setSchedules((prev) => [...prev, created]);
-      setShowCreate(false);
-      setCreateNicheId("");
-      setCreateInterval(60);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create schedule");
+      await runNow(nicheId);
     } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    setDeletingId(id);
-    try {
-      await deleteSchedule(id);
-      setSchedules((prev) => prev.filter((s) => s.id !== id));
-    } catch {
-      alert("Failed to delete schedule");
-    } finally {
-      setDeletingId(null);
+      setRunningNiche(null);
     }
   };
 
@@ -124,86 +92,73 @@ export default function SchedulesPage() {
     );
   }
 
+  if (!scheduler) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        Failed to load scheduler status
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Schedules</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage automated analysis schedules
-          </p>
-        </div>
-        <Button onClick={() => setShowCreate(true)} disabled={showCreate}>
-          <Plus /> Create Schedule
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Scheduler</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage automated trend collection
+        </p>
       </div>
 
-      {showCreate && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Schedule</CardTitle>
+      {/* Global Scheduler Control */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle>Scheduler Control</CardTitle>
             <CardDescription>
-              Set up automatic analysis for a niche
+              Status:{" "}
+              {scheduler.running ? (
+                <span className="text-green-600 font-medium">Running</span>
+              ) : (
+                <span className="text-muted-foreground font-medium">
+                  Stopped
+                </span>
+              )}
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Niche</label>
-                <Select value={createNicheId} onValueChange={setCreateNicheId}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select a niche" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {niches.map((n) => (
-                      <SelectItem key={n.id} value={String(n.id)}>
-                        {n.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  Interval (minutes)
-                </label>
-                <input
-                  type="number"
-                  min={15}
-                  max={1440}
-                  value={createInterval}
-                  onChange={(e) => setCreateInterval(parseInt(e.target.value))}
-                  className="h-9 w-24 rounded-md border bg-background px-3 text-sm"
-                />
-              </div>
-              <Button
-                onClick={handleCreate}
-                disabled={!createNicheId || creating}
-              >
-                {creating ? "Creating..." : "Create"}
+          </div>
+          <div className="flex items-center gap-3">
+            <Select
+              value={selectedInterval}
+              onValueChange={setSelectedInterval}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERVAL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {scheduler.running ? (
+              <Button variant="destructive" onClick={handleStop}>
+                Stop All
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowCreate(false);
-                  setCreateNicheId("");
-                  setCreateInterval(60);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            ) : (
+              <Button onClick={handleStart}>Start All</Button>
+            )}
+          </div>
+        </CardHeader>
+      </Card>
 
+      {/* Per-Niche Controls */}
       <Card>
         <CardHeader>
-          <CardTitle>Scheduled Jobs</CardTitle>
+          <CardTitle>Per-Niche Schedules</CardTitle>
           <CardDescription>
-            {schedules.length} schedule{schedules.length === 1 ? "" : "s"}{" "}
-            configured &middot;{" "}
-            {schedules.filter((s) => s.is_enabled).length} active
+            {scheduler.niches.filter((n) => n.is_enabled).length} of{" "}
+            {scheduler.niches.length} enabled
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -214,107 +169,66 @@ export default function SchedulesPage() {
                   <th className="pb-2 pr-4 font-medium">Niche</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
                   <th className="pb-2 pr-4 font-medium">Interval</th>
+                  <th className="pb-2 pr-4 font-medium text-right">
+                    Active Trends
+                  </th>
                   <th className="pb-2 pr-4 font-medium">Last Run</th>
                   <th className="pb-2 pr-4 font-medium">Next Run</th>
-                  <th className="pb-2 font-medium w-10" />
+                  <th className="pb-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
-                {schedules.map((schedule) => (
-                  <tr key={schedule.id} className="border-b last:border-0">
+                {scheduler.niches.map((niche) => (
+                  <tr key={niche.niche_id} className="border-b last:border-0">
                     <td className="py-3 pr-4 font-medium">
-                      {schedule.niche_name || `Niche #${schedule.niche_id}`}
+                      {niche.niche_name}
                     </td>
                     <td className="py-3 pr-4">
                       <Button
-                        size="xs"
-                        variant={schedule.is_enabled ? "default" : "outline"}
-                        onClick={() => handleToggle(schedule)}
+                        size="sm"
+                        variant={niche.is_enabled ? "default" : "outline"}
+                        onClick={() =>
+                          handleToggleNiche(niche.niche_id, niche.is_enabled)
+                        }
                         className={
-                          schedule.is_enabled
+                          niche.is_enabled
                             ? "bg-green-600 hover:bg-green-700 text-white"
                             : ""
                         }
                       >
-                        {schedule.is_enabled ? "Enabled" : "Disabled"}
+                        {niche.is_enabled ? "Enabled" : "Disabled"}
                       </Button>
                     </td>
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-muted-foreground">Every</span>
-                        <input
-                          type="number"
-                          min={15}
-                          max={1440}
-                          value={schedule.interval_minutes}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value);
-                            if (val >= 15 && val <= 1440) {
-                              handleIntervalChange(schedule, val);
-                            }
-                          }}
-                          className="w-16 rounded-md border bg-background px-2 py-1 text-sm tabular-nums"
-                        />
-                        <span className="text-muted-foreground">min</span>
-                      </div>
+                    <td className="py-3 pr-4 text-muted-foreground">
+                      Every {niche.interval_minutes} min
+                    </td>
+                    <td className="py-3 pr-4 text-right tabular-nums">
+                      {niche.trend_count}
                     </td>
                     <td className="py-3 pr-4 text-muted-foreground">
-                      {schedule.last_run_at
-                        ? new Date(schedule.last_run_at).toLocaleString()
+                      {niche.last_run_at
+                        ? new Date(niche.last_run_at).toLocaleString()
                         : "Never"}
                     </td>
                     <td className="py-3 pr-4 text-muted-foreground">
-                      {schedule.is_enabled && schedule.next_run_at
-                        ? new Date(schedule.next_run_at).toLocaleString()
+                      {niche.is_enabled && niche.next_run_at
+                        ? new Date(niche.next_run_at).toLocaleString()
                         : "—"}
                     </td>
                     <td className="py-3">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            disabled={deletingId === schedule.id}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Delete schedule
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete this schedule for{" "}
-                              <strong>{schedule.niche_name}</strong>. Automatic
-                              analysis will stop.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              variant="destructive"
-                              onClick={() => handleDelete(schedule.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRunNiche(niche.niche_id)}
+                        disabled={runningNiche === niche.niche_id}
+                      >
+                        {runningNiche === niche.niche_id
+                          ? "Running..."
+                          : "Run Now"}
+                      </Button>
                     </td>
                   </tr>
                 ))}
-                {schedules.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="py-8 text-center text-muted-foreground"
-                    >
-                      No schedules configured. Create one to get started.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

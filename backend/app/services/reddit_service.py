@@ -18,15 +18,14 @@ class RedditService:
 
     def fetch_subreddit_posts(self, subreddit: str) -> list[dict]:
         endpoints = [
-            f"https://www.reddit.com/r/{subreddit}/hot.json?limit=25",
-            f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=25",
-            f"https://www.reddit.com/r/{subreddit}/rising.json?limit=10",
+            (f"https://www.reddit.com/r/{subreddit}/hot.json?limit=25", "hot"),
+            (f"https://www.reddit.com/r/{subreddit}/rising.json?limit=10", "rising"),
         ]
 
         seen_ids = set()
         posts = []
 
-        for url in endpoints:
+        for url, trend_type in endpoints:
             try:
                 time.sleep(2)
                 response = self.client.get(url)
@@ -52,6 +51,7 @@ class RedditService:
                         "num_comments": post.get("num_comments", 0),
                         "subreddit": post.get("subreddit", subreddit),
                         "permalink": post.get("permalink", ""),
+                        "trend_type": trend_type,
                     })
             except Exception as e:
                 logger.warning(f"Failed to fetch {url}: {e}")
