@@ -2,14 +2,11 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
+      args:
+        - NEXT_PUBLIC_API_URL=https://api.trendsradar.com
     ports:
       - "3005:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3006
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
     depends_on:
       - backend
     restart: unless-stopped
@@ -17,13 +14,11 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     ports:
       - "3006:8000"
     env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend/app:/app/app
+      - ./backend/.env.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,12 +29,10 @@ services:
   celery_worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     command: celery -A app.celery_app worker --loglevel=info
     env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend/app:/app/app
+      - ./backend/.env.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,12 +43,10 @@ services:
   celery_beat:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     command: celery -A app.celery_app beat --loglevel=info
     env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend/app:/app/app
+      - ./backend/.env.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,10 +58,8 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: trendsradar
-      POSTGRES_PASSWORD: trendsradar
+      POSTGRES_PASSWORD: CHANGE_ME
       POSTGRES_DB: trendsradar
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -82,8 +71,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/var/lib/redis/data
     healthcheck:
