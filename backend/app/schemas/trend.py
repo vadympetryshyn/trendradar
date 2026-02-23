@@ -41,6 +41,7 @@ class TrendDetail(BaseModel):
     mention_count: int
     relevance_score: float
     context_summary: str | None
+    research_citations: list[str]
     research_done: bool
     has_embedding: bool
     researched_at: datetime | None
@@ -72,6 +73,7 @@ class TrendSearchResult(BaseModel):
     category: str
     relevance_score: float
     similarity: float
+    collected_at: datetime
 
     model_config = {"from_attributes": True}
 

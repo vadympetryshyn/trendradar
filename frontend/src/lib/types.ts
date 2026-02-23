@@ -29,6 +29,7 @@ export interface Trend {
 
 export interface TrendDetail extends Trend {
   context_summary: string | null;
+  research_citations: string[];
   researched_at: string | null;
   expired_at: string | null;
 }
@@ -49,6 +50,7 @@ export interface TrendSearchResult {
   category: string;
   relevance_score: number;
   similarity: number;
+  collected_at: string;
 }
 
 export interface TrendSearchResponse {

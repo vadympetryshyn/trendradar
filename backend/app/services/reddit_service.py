@@ -37,6 +37,8 @@ class RedditService:
                     post_id = post.get("id")
                     if not post_id or post_id in seen_ids:
                         continue
+                    if post.get("stickied", False):
+                        continue
                     seen_ids.add(post_id)
 
                     selftext = post.get("selftext", "") or ""

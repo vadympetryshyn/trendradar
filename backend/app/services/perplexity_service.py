@@ -27,10 +27,11 @@ class PerplexityService:
     def __init__(self):
         self.api_key = settings.perplexity_api_key
 
-    def research_trend(self, title: str, summary: str) -> str | None:
+    def research_trend(self, title: str, summary: str) -> tuple[str | None, list[str]]:
+        """Returns (content, citations) tuple."""
         if not self.api_key:
             logger.warning("Perplexity API key not configured, skipping research")
-            return None
+            return None, []
 
         try:
             prompt = RESEARCH_PROMPT.format(title=title, summary=summary)
@@ -54,8 +55,9 @@ class PerplexityService:
                 result = response.json()
 
                 content = result["choices"][0]["message"]["content"]
-                return content[:3000]
+                citations = result.get("citations", [])
+                return content[:3000], citations
 
         except Exception as e:
             logger.error(f"Perplexity research failed for '{title}': {e}")
-            return None
+            return None, []

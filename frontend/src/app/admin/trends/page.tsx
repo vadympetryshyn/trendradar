@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -11,7 +12,19 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getTrends, getNiches } from "@/lib/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { getTrends, getNiches, deleteTrendsBulk } from "@/lib/api";
 import type { Niche, Trend } from "@/lib/types";
 
 export default function TrendsPage() {
@@ -26,6 +39,8 @@ export default function TrendsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [researchedFilter, setResearchedFilter] = useState<string>("all");
   const [embeddingFilter, setEmbeddingFilter] = useState<string>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const limit = 20;
 
   useEffect(() => {
@@ -64,6 +79,43 @@ export default function TrendsPage() {
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
 
+  const allSelected = trends.length > 0 && trends.every((t) => selectedIds.has(t.id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(trends.map((t) => t.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      await deleteTrendsBulk(Array.from(selectedIds));
+      setTrends((prev) => prev.filter((t) => !selectedIds.has(t.id)));
+      setTotal((prev) => prev - selectedIds.size);
+      setSelectedIds(new Set());
+    } catch {
+      alert("Failed to delete trends");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading && trends.length === 0) {
     return (
       <div className="py-8 text-center text-muted-foreground">Loading...</div>
@@ -72,11 +124,37 @@ export default function TrendsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Trends Browser</h1>
-        <p className="text-muted-foreground mt-1">
-          Browse and filter all collected trends
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Trends Browser</h1>
+          <p className="text-muted-foreground mt-1">
+            Browse and filter all collected trends
+          </p>
+        </div>
+        {selectedIds.size > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={deleting}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {selectedIds.size} trend(s)</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Permanently delete the selected trends? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {/* Filters */}
@@ -177,6 +255,12 @@ export default function TrendsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 pr-4 font-medium w-10">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
                   <th className="pb-2 pr-4 font-medium">Title</th>
                   <th className="pb-2 pr-4 font-medium">Type</th>
                   <th className="pb-2 pr-4 font-medium">Sentiment</th>
@@ -192,9 +276,15 @@ export default function TrendsPage() {
                 {trends.map((trend) => (
                   <tr
                     key={trend.id}
-                    className="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                    className={`border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors ${selectedIds.has(trend.id) ? "bg-muted/30" : ""}`}
                     onClick={() => router.push(`/admin/trends/${trend.id}`)}
                   >
+                    <td className="py-3 pr-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(trend.id)}
+                        onCheckedChange={() => toggleSelect(trend.id)}
+                      />
+                    </td>
                     <td className="py-3 pr-4 font-medium max-w-[300px] truncate">
                       {trend.title}
                     </td>
@@ -263,7 +353,7 @@ export default function TrendsPage() {
                 {trends.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No trends found.

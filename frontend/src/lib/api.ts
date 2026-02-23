@@ -51,8 +51,9 @@ export function getTrends(params?: {
   return fetchApi(`/api/v1/trends${qs ? `?${qs}` : ""}`);
 }
 
-export function getTrend(id: string): Promise<TrendDetail> {
-  return fetchApi(`/api/v1/trends/${id}`);
+export function getTrend(id: string, webSearch = false): Promise<TrendDetail> {
+  const qs = webSearch ? "?web_search=true" : "";
+  return fetchApi(`/api/v1/trends/${id}${qs}`);
 }
 
 export function searchTrends(
@@ -150,6 +151,28 @@ export function deleteCollectionTask(
   id: number
 ): Promise<{ detail: string }> {
   return fetchApi(`/api/v1/admin/tasks/${id}`, { method: "DELETE" });
+}
+
+export function deleteCollectionTasksBulk(
+  ids: number[]
+): Promise<{ detail: string }> {
+  return fetchApi("/api/v1/admin/tasks/bulk", {
+    method: "DELETE",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export function deleteTrendsBulk(
+  ids: string[]
+): Promise<{ detail: string }> {
+  return fetchApi("/api/v1/trends/bulk", {
+    method: "DELETE",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export function deleteExpiredTrends(): Promise<{ detail: string }> {
+  return fetchApi("/api/v1/admin/trends/expired", { method: "DELETE" });
 }
 
 // ── Stats ───────────────────────────────────────────────────────────

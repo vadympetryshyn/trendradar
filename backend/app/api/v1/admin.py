@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -253,6 +255,25 @@ def stop_task(task_id: int, db: Session = Depends(get_db)):
     return _task_to_response(task)
 
 
+@router.delete("/tasks/bulk")
+def delete_tasks_bulk(
+    ids: List[int] = Body(..., embed=True),
+    db: Session = Depends(get_db),
+):
+    tasks = db.query(CollectionTask).filter(CollectionTask.id.in_(ids)).all()
+    if not tasks:
+        raise HTTPException(status_code=404, detail="No tasks found")
+
+    for task in tasks:
+        if task.status in ("queued", "running") and task.celery_task_id:
+            from app.celery_app import celery_app
+            celery_app.control.revoke(task.celery_task_id, terminate=True, signal="SIGTERM")
+        db.delete(task)
+
+    db.commit()
+    return {"detail": f"{len(tasks)} task(s) deleted"}
+
+
 @router.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db)):
     task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
@@ -269,6 +290,16 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     return {"detail": "Task deleted"}
 
 
+# ── Trend cleanup endpoint ────────────────────────────────────────────
+
+
+@router.delete("/trends/expired")
+def delete_expired_trends(db: Session = Depends(get_db)):
+    deleted = db.query(Trend).filter(Trend.status == "expired").delete()
+    db.commit()
+    return {"detail": f"{deleted} expired trend(s) deleted"}
+
+
 # ── Stats endpoint ────────────────────────────────────────────────────
 
 
@@ -276,8 +307,8 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 def get_dashboard_stats(db: Session = Depends(get_db)):
     active_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active").scalar()
     expired_trends = db.query(func.count(Trend.id)).filter(Trend.status == "expired").scalar()
-    researched_trends = db.query(func.count(Trend.id)).filter(Trend.research_done.is_(True)).scalar()
-    embedded_trends = db.query(func.count(Trend.id)).filter(Trend.embedding.isnot(None)).scalar()
+    researched_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active", Trend.research_done.is_(True)).scalar()
+    embedded_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active", Trend.embedding.isnot(None)).scalar()
     total_niches = db.query(func.count(Niche.id)).filter(Niche.is_active.is_(True)).scalar()
 
     return DashboardStatsResponse(

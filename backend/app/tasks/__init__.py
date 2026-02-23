@@ -122,14 +122,13 @@ def cleanup_expired_trends():
 
     db = SessionLocal()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         deleted = (
             db.query(Trend)
-            .filter(Trend.status == "expired", Trend.expired_at < cutoff)
+            .filter(Trend.status == "expired")
             .delete()
         )
         db.commit()
-        logger.info(f"Cleanup: deleted {deleted} expired trends older than 30 days")
+        logger.info(f"Cleanup: deleted {deleted} expired trends")
         return {"deleted": deleted}
     finally:
         db.close()

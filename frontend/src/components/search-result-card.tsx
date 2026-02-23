@@ -63,6 +63,9 @@ export function SearchResultCard({ result }: SearchResultCardProps) {
           <CardDescription className="text-sm leading-relaxed">
             {result.summary}
           </CardDescription>
+          <p className="text-xs text-muted-foreground mt-3">
+            {new Date(result.collected_at).toLocaleDateString()}
+          </p>
         </CardContent>
       </Card>
     </Link>

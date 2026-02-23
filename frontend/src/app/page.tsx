@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { TrendsGrid } from "@/components/trends-grid";
@@ -20,9 +20,9 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TrendSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const isSearching = searchQuery.trim().length >= 2;
+  const isSearching = hasSearched;
 
   useEffect(() => {
     getNiches()
@@ -51,29 +51,23 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, [selectedNicheId, trendTypeFilter, isSearching]);
 
-  // Debounced vector search
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+  const handleSearch = () => {
+    if (searchQuery.trim().length < 2) return;
+    setHasSearched(true);
+    setSearchLoading(true);
+    setError(null);
 
-    if (!isSearching) {
-      setSearchResults([]);
-      return;
-    }
+    searchTrends(searchQuery.trim(), undefined, 20)
+      .then((data) => setSearchResults(data.results))
+      .catch((err) => setError(err.message))
+      .finally(() => setSearchLoading(false));
+  };
 
-    debounceRef.current = setTimeout(() => {
-      setSearchLoading(true);
-      setError(null);
-
-      searchTrends(searchQuery.trim(), undefined, 20)
-        .then((data) => setSearchResults(data.results))
-        .catch((err) => setError(err.message))
-        .finally(() => setSearchLoading(false));
-    }, 400);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [searchQuery, isSearching]);
+  const handleClear = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setHasSearched(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -85,49 +79,65 @@ export default function Home() {
       </div>
 
       {/* Search input */}
-      <div className="relative">
-        <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-          />
-        </svg>
-        <input
-          type="text"
-          placeholder="Search trends by meaning, not just keywords..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-lg border border-input bg-background px-10 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
           >
-            <svg
-              className="h-4 w-4"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+            />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search trends by meaning, not just keywords..."
+            value={searchQuery}
+            onChange={(e) => {
+            setSearchQuery(e.target.value);
+            if (e.target.value.trim() === "") {
+              setHasSearched(false);
+              setSearchResults([]);
+            }
+          }}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            className="w-full rounded-lg border border-input bg-background px-10 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          />
+          {searchQuery && (
+            <button
+              onClick={handleClear}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18 18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        )}
+              <svg
+                className="h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18 18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+        <button
+          onClick={handleSearch}
+          disabled={searchQuery.trim().length < 2 || searchLoading}
+          className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          Search
+        </button>
       </div>
 
       {/* Filters (hidden during search) */}

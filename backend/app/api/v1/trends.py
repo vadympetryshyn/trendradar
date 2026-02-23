@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -100,15 +102,32 @@ def get_recommended(
             category=trend.category,
             relevance_score=trend.relevance_score,
             similarity=round(similarity, 4),
+            collected_at=trend.collected_at,
         ))
 
     return TrendSearchResponse(results=items, query=description)
 
 
+@router.delete("/bulk")
+def delete_trends_bulk(
+    ids: List[str] = Body(..., embed=True),
+    db: Session = Depends(get_db),
+):
+    trends = db.query(Trend).filter(Trend.id.in_(ids)).all()
+    if not trends:
+        raise HTTPException(status_code=404, detail="No trends found")
+
+    for trend in trends:
+        db.delete(trend)
+
+    db.commit()
+    return {"detail": f"{len(trends)} trend(s) deleted"}
+
+
 @router.get("/{trend_id}", response_model=TrendDetail)
-def get_trend(trend_id: str, db: Session = Depends(get_db)):
+def get_trend(trend_id: str, web_search: bool = Query(False), db: Session = Depends(get_db)):
     service = TrendCollectionService(db)
-    trend = service.get_trend_by_id(trend_id)
+    trend = service.get_trend_by_id(trend_id, web_search=web_search)
     if not trend:
         raise HTTPException(status_code=404, detail="Trend not found")
 
@@ -128,6 +147,7 @@ def get_trend(trend_id: str, db: Session = Depends(get_db)):
         mention_count=trend.mention_count,
         relevance_score=trend.relevance_score,
         context_summary=trend.context_summary,
+        research_citations=trend.research_citations or [],
         research_done=trend.research_done,
         has_embedding=trend.embedding is not None,
         researched_at=trend.researched_at,
@@ -169,6 +189,7 @@ def search_trends(
             category=trend.category,
             relevance_score=trend.relevance_score,
             similarity=round(similarity, 4),
+            collected_at=trend.collected_at,
         ))
 
     return TrendSearchResponse(results=items, query=request.query)

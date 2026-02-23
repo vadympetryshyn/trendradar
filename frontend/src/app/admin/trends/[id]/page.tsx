@@ -12,7 +12,12 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getTrend } from "@/lib/api";
+import { MarkdownContent } from "@/components/markdown-content";
 import type { TrendDetail } from "@/lib/types";
+
+function stripSubredditPrefix(sub: string): string {
+  return sub.replace(/^\/?(r\/)+/, "");
+}
 
 export default function TrendDetailPage() {
   const params = useParams();
@@ -24,11 +29,11 @@ export default function TrendDetailPage() {
 
   const id = params.id as string;
 
-  const fetchTrend = (showResearchLoading = false) => {
-    if (showResearchLoading) setResearching(true);
+  const fetchTrend = (webSearch = false) => {
+    if (webSearch) setResearching(true);
     else setLoading(true);
 
-    getTrend(id)
+    getTrend(id, webSearch)
       .then(setTrend)
       .catch((err) => setError(err.message))
       .finally(() => {
@@ -178,10 +183,11 @@ export default function TrendDetailPage() {
             </div>
           )}
           {!researching && trend.context_summary && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                {trend.context_summary}
-              </p>
+            <div className="max-w-none">
+              <MarkdownContent
+                content={trend.context_summary}
+                citations={trend.research_citations}
+              />
             </div>
           )}
           {!researching && !trend.context_summary && !trend.research_done && (
@@ -202,11 +208,21 @@ export default function TrendDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {trend.source_subreddits.map((sub) => (
-                  <Badge key={sub} variant="outline">
-                    r/{sub}
-                  </Badge>
-                ))}
+                {trend.source_subreddits.map((sub) => {
+                  const name = stripSubredditPrefix(sub);
+                  return (
+                    <a
+                      key={sub}
+                      href={`https://www.reddit.com/r/${name}/${trend.trend_type === "rising" ? "rising" : "hot"}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                        r/{name}
+                      </Badge>
+                    </a>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

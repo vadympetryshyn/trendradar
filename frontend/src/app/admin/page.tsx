@@ -19,6 +19,7 @@ import {
   stopScheduler,
   startNicheSchedule,
   stopNicheSchedule,
+  deleteExpiredTrends,
 } from "@/lib/api";
 import type {
   CollectionTask,
@@ -166,7 +167,21 @@ export default function AdminPage() {
               <CardDescription>Expired Trends</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{stats.expired_trends}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-2xl font-bold">{stats.expired_trends}</p>
+                {stats.expired_trends > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      await deleteExpiredTrends();
+                      fetchData();
+                    }}
+                  >
+                    Purge
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
           <Card>

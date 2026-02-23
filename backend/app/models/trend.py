@@ -31,6 +31,7 @@ class Trend(Base):
     mention_count: Mapped[int] = mapped_column(Integer, default=0)
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0)
     context_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    research_citations: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     research_done: Mapped[bool] = mapped_column(Boolean, default=False)
     researched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     embedding = mapped_column(Vector(1536), nullable=True)

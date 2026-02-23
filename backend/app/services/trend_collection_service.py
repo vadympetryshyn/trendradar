@@ -40,16 +40,11 @@ class TrendCollectionService:
                 if p.get("permalink")
             }
 
-            # Mark existing active trends as expired
+            # Delete previous active trends (replaced by new collection)
             expired_count = (
                 self.db.query(Trend)
                 .filter(Trend.niche_id == niche_id, Trend.status == "active")
-                .update(
-                    {
-                        "status": "expired",
-                        "expired_at": datetime.now(timezone.utc),
-                    }
-                )
+                .delete()
             )
             self.db.flush()
 
@@ -102,16 +97,17 @@ class TrendCollectionService:
             reddit.close()
             gemini.close()
 
-    def get_trend_by_id(self, trend_id) -> Trend | None:
+    def get_trend_by_id(self, trend_id, web_search: bool = False) -> Trend | None:
         trend = self.db.query(Trend).filter(Trend.id == trend_id).first()
         if not trend:
             return None
 
-        if not trend.research_done:
+        if web_search and not trend.research_done:
             perplexity = PerplexityService()
-            context = perplexity.research_trend(trend.title, trend.summary)
+            context, citations = perplexity.research_trend(trend.title, trend.summary)
             if context:
                 trend.context_summary = context
+                trend.research_citations = citations
                 trend.research_done = True
                 trend.researched_at = datetime.now(timezone.utc)
 

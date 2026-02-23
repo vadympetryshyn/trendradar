@@ -22,6 +22,10 @@ interface TrendCardProps {
   trend: Trend;
 }
 
+function stripSubredditPrefix(sub: string): string {
+  return sub.replace(/^\/?(r\/)+/, "");
+}
+
 export function TrendCard({ trend }: TrendCardProps) {
   return (
     <Link href={`/admin/trends/${trend.id}`}>
@@ -81,14 +85,21 @@ export function TrendCard({ trend }: TrendCardProps) {
 
           {trend.source_subreddits.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">
-              {trend.source_subreddits.map((sub) => (
-                <span
-                  key={sub}
-                  className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
-                >
-                  r/{sub}
-                </span>
-              ))}
+              {trend.source_subreddits.map((sub) => {
+                const name = stripSubredditPrefix(sub);
+                return (
+                  <a
+                    key={sub}
+                    href={`https://www.reddit.com/r/${name}/${trend.trend_type === "rising" ? "rising" : "hot"}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full hover:text-foreground hover:bg-muted/80 transition-colors"
+                  >
+                    r/{name}
+                  </a>
+                );
+              })}
             </div>
           )}
 

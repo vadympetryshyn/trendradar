@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Square, Trash2 } from "lucide-react";
+import { CircleStop, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -22,13 +22,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   getCollectionTasks,
+  getSchedulerStatus,
   stopCollectionTask,
   deleteCollectionTask,
+  deleteCollectionTasksBulk,
   runNow,
 } from "@/lib/api";
-import type { CollectionTask } from "@/lib/types";
+import type { CollectionTask, SchedulerStatus } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
   queued: "bg-gray-100 text-gray-700",
@@ -56,7 +59,10 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [stoppingId, setStoppingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [triggeringAll, setTriggeringAll] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
+  const [runningNiches, setRunningNiches] = useState<Set<number>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const perPage = 20;
 
@@ -67,17 +73,35 @@ export default function TasksPage() {
     });
   }, [page, statusFilter]);
 
+  const fetchAll = useCallback(() => {
+    return Promise.all([
+      getCollectionTasks(page, perPage, statusFilter),
+      getSchedulerStatus(),
+    ]).then(([tasksData, schedulerData]) => {
+      setTasks(tasksData.items);
+      setTotal(tasksData.total);
+      setScheduler(schedulerData);
+
+      const activeNicheIds = new Set(
+        tasksData.items
+          .filter((t) => IN_PROGRESS.includes(t.status))
+          .map((t) => t.niche_id)
+      );
+      setRunningNiches(activeNicheIds);
+    });
+  }, [page, statusFilter]);
+
   useEffect(() => {
     setLoading(true);
-    fetchTasks().finally(() => setLoading(false));
-  }, [fetchTasks]);
+    fetchAll().finally(() => setLoading(false));
+  }, [fetchAll]);
 
   // Auto-refresh while there are in-progress tasks
   const hasInProgress = tasks.some((t) => IN_PROGRESS.includes(t.status));
 
   useEffect(() => {
     if (hasInProgress) {
-      pollRef.current = setInterval(fetchTasks, 3000);
+      pollRef.current = setInterval(fetchAll, 3000);
     }
     return () => {
       if (pollRef.current) {
@@ -85,13 +109,13 @@ export default function TasksPage() {
         pollRef.current = null;
       }
     };
-  }, [hasInProgress, fetchTasks]);
+  }, [hasInProgress, fetchAll]);
 
   const handleStop = async (id: number) => {
     setStoppingId(id);
     try {
       await stopCollectionTask(id);
-      await fetchTasks();
+      await fetchAll();
     } catch {
       alert("Failed to stop task");
     } finally {
@@ -112,19 +136,59 @@ export default function TasksPage() {
     }
   };
 
-  const handleRunAll = async () => {
-    setTriggeringAll(true);
+  const handleRunNiche = async (nicheId: number) => {
+    setRunningNiches((prev) => new Set(prev).add(nicheId));
     try {
-      await runNow();
-      await fetchTasks();
+      await runNow(nicheId);
+      setTimeout(fetchAll, 1000);
     } catch {
-      alert("Failed to trigger collection");
-    } finally {
-      setTriggeringAll(false);
+      setRunningNiches((prev) => {
+        const next = new Set(prev);
+        next.delete(nicheId);
+        return next;
+      });
     }
   };
 
   const totalPages = Math.ceil(total / perPage);
+
+  const allSelected =
+    tasks.length > 0 && tasks.every((t) => selectedIds.has(t.id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(tasks.map((t) => t.id)));
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      await deleteCollectionTasksBulk(Array.from(selectedIds));
+      setTasks((prev) => prev.filter((t) => !selectedIds.has(t.id)));
+      setTotal((prev) => prev - selectedIds.size);
+      setSelectedIds(new Set());
+    } catch {
+      alert("Failed to delete tasks");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   if (loading && tasks.length === 0) {
     return (
@@ -138,15 +202,94 @@ export default function TasksPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
           <p className="text-muted-foreground mt-1">
-            Collection task history and status
+            Run collection tasks and view history
           </p>
         </div>
-        <Button onClick={handleRunAll} disabled={triggeringAll}>
-          {triggeringAll ? "Triggering..." : "Run Now"}
-        </Button>
+        {selectedIds.size > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={bulkDeleting}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                {bulkDeleting
+                  ? "Deleting..."
+                  : `Delete Selected (${selectedIds.size})`}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Delete {selectedIds.size} task(s)
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Permanently delete the selected tasks? Running tasks will be
+                  stopped first.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
-      {/* Status filter */}
+      {/* Tasks by Niche */}
+      {scheduler && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tasks by Niche</CardTitle>
+            <CardDescription>
+              {scheduler.niches.length} niche{scheduler.niches.length !== 1 ? "s" : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {scheduler.niches.map((niche) => {
+                const isRunning = runningNiches.has(niche.niche_id);
+                return (
+                  <div
+                    key={niche.niche_id}
+                    className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{niche.niche_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {niche.trend_count} active trends
+                        </span>
+                        {isRunning && (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-blue-500">
+                            <span className="animate-spin rounded-full h-3 w-3 border-2 border-blue-500 border-t-transparent" />
+                            Collecting...
+                          </span>
+                        )}
+                      </div>
+                      {niche.last_run_at && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Last run: {new Date(niche.last_run_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRunNiche(niche.niche_id)}
+                      disabled={isRunning}
+                    >
+                      {isRunning ? "Running..." : "Run"}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Task History */}
       <div className="flex gap-2">
         {[undefined, "queued", "running", "completed", "failed", "stopped"].map(
           (s) => (
@@ -167,7 +310,7 @@ export default function TasksPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Collection Tasks</CardTitle>
+          <CardTitle>Task History</CardTitle>
           <CardDescription>
             {total} task{total !== 1 ? "s" : ""}
             {hasInProgress && " \u00b7 auto-refreshing"}
@@ -178,6 +321,12 @@ export default function TasksPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 pr-4 font-medium w-10">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
                   <th className="pb-2 pr-4 font-medium w-10">#</th>
                   <th className="pb-2 pr-4 font-medium">Niche</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
@@ -194,10 +343,19 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((task, index) => {
+                {tasks.map((task) => {
                   const isActive = IN_PROGRESS.includes(task.status);
                   return (
-                    <tr key={task.id} className="border-b last:border-0">
+                    <tr
+                      key={task.id}
+                      className={`border-b last:border-0 ${selectedIds.has(task.id) ? "bg-muted/30" : ""}`}
+                    >
+                      <td className="py-3 pr-4">
+                        <Checkbox
+                          checked={selectedIds.has(task.id)}
+                          onCheckedChange={() => toggleSelect(task.id)}
+                        />
+                      </td>
                       <td className="py-3 pr-4 text-muted-foreground tabular-nums">
                         {task.id}
                       </td>
@@ -245,7 +403,7 @@ export default function TasksPage() {
                               className="h-7 w-7 text-muted-foreground hover:text-orange-600"
                               title="Stop task"
                             >
-                              <Square className="h-3.5 w-3.5" />
+                              <CircleStop className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           <AlertDialog>
@@ -288,7 +446,7 @@ export default function TasksPage() {
                 {tasks.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No tasks found.
