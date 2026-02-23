@@ -26,14 +26,7 @@ import type {
   DashboardStats,
   SchedulerStatus,
 } from "@/lib/types";
-
-const STATUS_COLORS: Record<string, string> = {
-  queued: "bg-gray-100 text-gray-700",
-  running: "bg-blue-100 text-blue-700",
-  completed: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
-  stopped: "bg-yellow-100 text-yellow-700",
-};
+import { STATUS_COLORS } from "@/lib/constants";
 
 export default function AdminPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);

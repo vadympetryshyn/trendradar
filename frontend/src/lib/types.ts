@@ -2,6 +2,7 @@ export interface Niche {
   id: number;
   name: string;
   slug: string;
+  description: string;
   subreddits: string[];
   is_active: boolean;
   created_at: string;
@@ -12,7 +13,7 @@ export interface Trend {
   niche_id: number;
   title: string;
   summary: string;
-  trend_type: "hot" | "rising";
+  source_post_ids: string[];
   status: "active" | "expired";
   sentiment: string;
   sentiment_score: number;
@@ -45,7 +46,7 @@ export interface TrendSearchResult {
   id: string;
   title: string;
   summary: string;
-  trend_type: string;
+  source_post_ids: string[];
   sentiment: string;
   category: string;
   relevance_score: number;

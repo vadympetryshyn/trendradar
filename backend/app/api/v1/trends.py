@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -13,26 +13,54 @@ from app.schemas import (
     TrendSearchResponse,
     TrendSearchResult,
 )
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import EmbeddingService, get_embedding_service
 from app.services.trend_collection_service import TrendCollectionService
 
 router = APIRouter(prefix="/trends", tags=["trends"])
 
 
+def _build_search_result(trend: Trend, distance: float) -> TrendSearchResult:
+    similarity = round(1 - distance, 4)
+    return TrendSearchResult(
+        id=str(trend.id),
+        title=trend.title,
+        summary=trend.summary,
+        source_post_ids=trend.source_post_ids or [],
+        sentiment=trend.sentiment,
+        category=trend.category,
+        relevance_score=trend.relevance_score,
+        similarity=similarity,
+        collected_at=trend.collected_at,
+    )
+
+
 @router.get("", response_model=TrendListResponse)
 def list_trends(
-    niche_id: int | None = Query(None),
-    trend_type: str | None = Query(None),
+    niche_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    research_done: Optional[bool] = Query(None),
+    has_embedding: Optional[bool] = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Trend).filter(Trend.status == "active")
+    query = db.query(Trend)
+
+    if status is not None:
+        query = query.filter(Trend.status == status)
+    else:
+        query = query.filter(Trend.status == "active")
 
     if niche_id is not None:
         query = query.filter(Trend.niche_id == niche_id)
-    if trend_type is not None:
-        query = query.filter(Trend.trend_type == trend_type)
+
+    if research_done is not None:
+        query = query.filter(Trend.research_done.is_(research_done))
+
+    if has_embedding is True:
+        query = query.filter(Trend.embedding.isnot(None))
+    elif has_embedding is False:
+        query = query.filter(Trend.embedding.is_(None))
 
     total = query.count()
     trends = (
@@ -42,29 +70,12 @@ def list_trends(
         .all()
     )
 
-    items = []
-    for t in trends:
-        items.append(TrendListItem(
-            id=str(t.id),
-            niche_id=t.niche_id,
-            title=t.title,
-            summary=t.summary,
-            trend_type=t.trend_type,
-            status=t.status,
-            sentiment=t.sentiment,
-            sentiment_score=t.sentiment_score,
-            category=t.category,
-            key_points=t.key_points,
-            source_urls=t.source_urls,
-            source_subreddits=t.source_subreddits,
-            mention_count=t.mention_count,
-            relevance_score=t.relevance_score,
-            research_done=t.research_done,
-            has_embedding=t.embedding is not None,
-            collected_at=t.collected_at,
-        ))
-
-    return TrendListResponse(items=items, total=total, limit=limit, offset=offset)
+    return TrendListResponse(
+        items=[TrendListItem.model_validate(t) for t in trends],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/recommended", response_model=TrendSearchResponse)
@@ -72,8 +83,8 @@ def get_recommended(
     description: str = Query(..., min_length=3),
     limit: int = Query(5, ge=1, le=20),
     db: Session = Depends(get_db),
+    embedding_service: EmbeddingService = Depends(get_embedding_service),
 ):
-    embedding_service = EmbeddingService()
     query_embedding = embedding_service.generate_embedding(description)
 
     if query_embedding is None:
@@ -90,22 +101,10 @@ def get_recommended(
         .all()
     )
 
-    items = []
-    for trend, distance in results:
-        similarity = 1 - distance
-        items.append(TrendSearchResult(
-            id=str(trend.id),
-            title=trend.title,
-            summary=trend.summary,
-            trend_type=trend.trend_type,
-            sentiment=trend.sentiment,
-            category=trend.category,
-            relevance_score=trend.relevance_score,
-            similarity=round(similarity, 4),
-            collected_at=trend.collected_at,
-        ))
-
-    return TrendSearchResponse(results=items, query=description)
+    return TrendSearchResponse(
+        results=[_build_search_result(trend, distance) for trend, distance in results],
+        query=description,
+    )
 
 
 @router.delete("/bulk")
@@ -113,15 +112,12 @@ def delete_trends_bulk(
     ids: List[str] = Body(..., embed=True),
     db: Session = Depends(get_db),
 ):
-    trends = db.query(Trend).filter(Trend.id.in_(ids)).all()
-    if not trends:
+    deleted = db.query(Trend).filter(Trend.id.in_(ids)).delete(synchronize_session="fetch")
+    if not deleted:
         raise HTTPException(status_code=404, detail="No trends found")
 
-    for trend in trends:
-        db.delete(trend)
-
     db.commit()
-    return {"detail": f"{len(trends)} trend(s) deleted"}
+    return {"detail": f"{deleted} trend(s) deleted"}
 
 
 @router.get("/{trend_id}", response_model=TrendDetail)
@@ -131,37 +127,15 @@ def get_trend(trend_id: str, web_search: bool = Query(False), db: Session = Depe
     if not trend:
         raise HTTPException(status_code=404, detail="Trend not found")
 
-    return TrendDetail(
-        id=str(trend.id),
-        niche_id=trend.niche_id,
-        title=trend.title,
-        summary=trend.summary,
-        trend_type=trend.trend_type,
-        status=trend.status,
-        sentiment=trend.sentiment,
-        sentiment_score=trend.sentiment_score,
-        category=trend.category,
-        key_points=trend.key_points,
-        source_urls=trend.source_urls,
-        source_subreddits=trend.source_subreddits,
-        mention_count=trend.mention_count,
-        relevance_score=trend.relevance_score,
-        context_summary=trend.context_summary,
-        research_citations=trend.research_citations or [],
-        research_done=trend.research_done,
-        has_embedding=trend.embedding is not None,
-        researched_at=trend.researched_at,
-        collected_at=trend.collected_at,
-        expired_at=trend.expired_at,
-    )
+    return TrendDetail.model_validate(trend)
 
 
 @router.post("/search", response_model=TrendSearchResponse)
 def search_trends(
     request: TrendSearchRequest,
     db: Session = Depends(get_db),
+    embedding_service: EmbeddingService = Depends(get_embedding_service),
 ):
-    embedding_service = EmbeddingService()
     query_embedding = embedding_service.generate_embedding(request.query)
 
     if query_embedding is None:
@@ -177,19 +151,7 @@ def search_trends(
 
     results = query.order_by("distance").limit(request.limit).all()
 
-    items = []
-    for trend, distance in results:
-        similarity = 1 - distance
-        items.append(TrendSearchResult(
-            id=str(trend.id),
-            title=trend.title,
-            summary=trend.summary,
-            trend_type=trend.trend_type,
-            sentiment=trend.sentiment,
-            category=trend.category,
-            relevance_score=trend.relevance_score,
-            similarity=round(similarity, 4),
-            collected_at=trend.collected_at,
-        ))
-
-    return TrendSearchResponse(results=items, query=request.query)
+    return TrendSearchResponse(
+        results=[_build_search_result(trend, distance) for trend, distance in results],
+        query=request.query,
+    )

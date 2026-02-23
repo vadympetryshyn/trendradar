@@ -20,12 +20,17 @@ def seed_data(db: Session):
             # Update subreddits from config if changed
             if set(existing.subreddits) != set(entry["subreddits"]):
                 existing.subreddits = entry["subreddits"]
+            # Update description from config if changed
+            new_desc = entry.get("description", "")
+            if existing.description != new_desc:
+                existing.description = new_desc
             continue
 
         niche = Niche(
             name=entry["name"],
             slug=entry["slug"],
             subreddits=entry["subreddits"],
+            description=entry.get("description", ""),
             is_active=True,
         )
         db.add(niche)

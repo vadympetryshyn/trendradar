@@ -9,21 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SENTIMENT_COLORS } from "@/lib/constants";
+import { stripSubredditPrefix } from "@/lib/format";
 import type { Trend } from "@/lib/types";
-
-const sentimentColors: Record<string, string> = {
-  positive: "bg-green-100 text-green-800 border-green-200",
-  negative: "bg-red-100 text-red-800 border-red-200",
-  neutral: "bg-gray-100 text-gray-800 border-gray-200",
-  mixed: "bg-yellow-100 text-yellow-800 border-yellow-200",
-};
 
 interface TrendCardProps {
   trend: Trend;
-}
-
-function stripSubredditPrefix(sub: string): string {
-  return sub.replace(/^\/?(r\/)+/, "");
 }
 
 export function TrendCard({ trend }: TrendCardProps) {
@@ -40,17 +31,7 @@ export function TrendCard({ trend }: TrendCardProps) {
           <div className="flex flex-wrap gap-2 pt-1">
             <Badge
               variant="outline"
-              className={
-                trend.trend_type === "rising"
-                  ? "bg-orange-100 text-orange-800 border-orange-200"
-                  : "bg-blue-100 text-blue-800 border-blue-200"
-              }
-            >
-              {trend.trend_type}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={sentimentColors[trend.sentiment] || sentimentColors.neutral}
+              className={SENTIMENT_COLORS[trend.sentiment] || SENTIMENT_COLORS.neutral}
             >
               {trend.sentiment}
             </Badge>
@@ -74,8 +55,8 @@ export function TrendCard({ trend }: TrendCardProps) {
 
           {trend.key_points.length > 0 && (
             <ul className="space-y-1 text-sm text-muted-foreground">
-              {trend.key_points.map((point, i) => (
-                <li key={i} className="flex gap-2">
+              {trend.key_points.map((point) => (
+                <li key={point} className="flex gap-2">
                   <span className="text-primary mt-0.5">&#8226;</span>
                   <span>{point}</span>
                 </li>
@@ -88,16 +69,18 @@ export function TrendCard({ trend }: TrendCardProps) {
               {trend.source_subreddits.map((sub) => {
                 const name = stripSubredditPrefix(sub);
                 return (
-                  <a
+                  <span
                     key={sub}
-                    href={`https://www.reddit.com/r/${name}/${trend.trend_type === "rising" ? "rising" : "hot"}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full hover:text-foreground hover:bg-muted/80 transition-colors"
+                    role="link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open(`https://www.reddit.com/r/${name}/`, "_blank", "noopener,noreferrer");
+                    }}
+                    className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
                   >
                     r/{name}
-                  </a>
+                  </span>
                 );
               })}
             </div>

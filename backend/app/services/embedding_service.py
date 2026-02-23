@@ -6,6 +6,8 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+_instance: "EmbeddingService | None" = None
+
 
 class EmbeddingService:
     def __init__(self):
@@ -32,6 +34,7 @@ class EmbeddingService:
             logger.warning("OpenAI API key not configured, skipping embeddings")
             return [None] * len(texts)
         try:
+            logger.info(f"Generating embeddings for {len(texts)} texts (model={self.model}, dims={settings.embedding_dimensions}) ...")
             response = self.client.embeddings.create(
                 input=texts,
                 model=self.model,
@@ -40,7 +43,15 @@ class EmbeddingService:
             result: list[list[float] | None] = [None] * len(texts)
             for item in response.data:
                 result[item.index] = item.embedding
+            logger.info(f"Embeddings generated successfully for {len(texts)} texts")
             return result
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
             return [None] * len(texts)
+
+
+def get_embedding_service() -> EmbeddingService:
+    global _instance
+    if _instance is None:
+        _instance = EmbeddingService()
+    return _instance

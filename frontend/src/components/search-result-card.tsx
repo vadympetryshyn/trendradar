@@ -9,14 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SENTIMENT_COLORS } from "@/lib/constants";
 import type { TrendSearchResult } from "@/lib/types";
-
-const sentimentColors: Record<string, string> = {
-  positive: "bg-green-100 text-green-800 border-green-200",
-  negative: "bg-red-100 text-red-800 border-red-200",
-  neutral: "bg-gray-100 text-gray-800 border-gray-200",
-  mixed: "bg-yellow-100 text-yellow-800 border-yellow-200",
-};
 
 interface SearchResultCardProps {
   result: TrendSearchResult;
@@ -41,17 +35,7 @@ export function SearchResultCard({ result }: SearchResultCardProps) {
             <Badge
               variant="outline"
               className={
-                result.trend_type === "rising"
-                  ? "bg-orange-100 text-orange-800 border-orange-200"
-                  : "bg-blue-100 text-blue-800 border-blue-200"
-              }
-            >
-              {result.trend_type}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={
-                sentimentColors[result.sentiment] || sentimentColors.neutral
+                SENTIMENT_COLORS[result.sentiment] || SENTIMENT_COLORS.neutral
               }
             >
               {result.sentiment}
@@ -64,7 +48,7 @@ export function SearchResultCard({ result }: SearchResultCardProps) {
             {result.summary}
           </CardDescription>
           <p className="text-xs text-muted-foreground mt-3">
-            {new Date(result.collected_at).toLocaleDateString()}
+            {new Date(result.collected_at).toLocaleString()}
           </p>
         </CardContent>
       </Card>

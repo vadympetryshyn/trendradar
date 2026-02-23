@@ -13,7 +13,6 @@ export default function Home() {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [trendTypeFilter, setTrendTypeFilter] = useState<string>("all");
   const [selectedNicheId, setSelectedNicheId] = useState<number | undefined>();
 
   // Search state
@@ -43,13 +42,12 @@ export default function Home() {
 
     getTrends({
       niche_id: selectedNicheId,
-      trend_type: trendTypeFilter === "all" ? undefined : trendTypeFilter,
       limit: 50,
     })
       .then((data) => setTrends(data.items))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [selectedNicheId, trendTypeFilter, isSearching]);
+  }, [selectedNicheId, isSearching]);
 
   const handleSearch = () => {
     if (searchQuery.trim().length < 2) return;
@@ -140,8 +138,8 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Filters (hidden during search) */}
-      {!isSearching && (
+      {/* Niche filter (hidden during search) */}
+      {!isSearching && niches.length > 1 && (
         <div className="flex items-center gap-3 flex-wrap">
           {niches.map((niche) => (
             <Badge
@@ -151,19 +149,6 @@ export default function Home() {
               onClick={() => setSelectedNicheId(niche.id)}
             >
               {niche.name}
-            </Badge>
-          ))}
-
-          <div className="h-6 w-px bg-border mx-1" />
-
-          {["all", "hot", "rising"].map((type) => (
-            <Badge
-              key={type}
-              variant={trendTypeFilter === type ? "default" : "outline"}
-              className="cursor-pointer text-sm px-3 py-1"
-              onClick={() => setTrendTypeFilter(type)}
-            >
-              {type === "all" ? "All" : type === "hot" ? "Hot" : "Rising"}
             </Badge>
           ))}
         </div>

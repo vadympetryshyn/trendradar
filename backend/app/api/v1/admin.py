@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -39,6 +39,22 @@ def _task_to_response(task: CollectionTask) -> CollectionTaskResponse:
     )
 
 
+def _build_niche_schedule_status(
+    config: ScheduleConfig, trend_count: int
+) -> NicheScheduleStatus:
+    niche = config.niche
+    return NicheScheduleStatus(
+        niche_id=config.niche_id,
+        niche_name=niche.name if niche else f"Niche #{config.niche_id}",
+        niche_slug=niche.slug if niche else "",
+        is_enabled=config.is_enabled,
+        interval_minutes=config.interval_minutes,
+        last_run_at=config.last_run_at,
+        next_run_at=config.next_run_at,
+        trend_count=trend_count,
+    )
+
+
 # ── Scheduler endpoints ──────────────────────────────────────────────
 
 
@@ -52,24 +68,18 @@ def get_scheduler_status(db: Session = Depends(get_db)):
     )
     any_running = any(c.is_enabled for c in configs)
 
-    niches_status = []
-    for config in configs:
-        niche = config.niche
-        trend_count = (
-            db.query(func.count(Trend.id))
-            .filter(Trend.niche_id == config.niche_id, Trend.status == "active")
-            .scalar()
-        )
-        niches_status.append(NicheScheduleStatus(
-            niche_id=config.niche_id,
-            niche_name=niche.name if niche else f"Niche #{config.niche_id}",
-            niche_slug=niche.slug if niche else "",
-            is_enabled=config.is_enabled,
-            interval_minutes=config.interval_minutes,
-            last_run_at=config.last_run_at,
-            next_run_at=config.next_run_at,
-            trend_count=trend_count,
-        ))
+    # Single grouped query instead of N+1
+    trend_counts = dict(
+        db.query(Trend.niche_id, func.count(Trend.id))
+        .filter(Trend.status == "active")
+        .group_by(Trend.niche_id)
+        .all()
+    )
+
+    niches_status = [
+        _build_niche_schedule_status(config, trend_counts.get(config.niche_id, 0))
+        for config in configs
+    ]
 
     return SchedulerStatusResponse(running=any_running, niches=niches_status)
 
@@ -79,11 +89,22 @@ def start_scheduler(
     request: SchedulerStartRequest,
     db: Session = Depends(get_db),
 ):
-    configs = db.query(ScheduleConfig).join(Niche).filter(Niche.is_active.is_(True)).all()
-    for config in configs:
-        config.is_enabled = True
-        config.interval_minutes = request.interval_minutes
-        config.updated_at = datetime.now(timezone.utc)
+    (
+        db.query(ScheduleConfig)
+        .filter(
+            ScheduleConfig.niche_id.in_(
+                db.query(Niche.id).filter(Niche.is_active.is_(True))
+            )
+        )
+        .update(
+            {
+                ScheduleConfig.is_enabled: True,
+                ScheduleConfig.interval_minutes: request.interval_minutes,
+                ScheduleConfig.updated_at: datetime.now(timezone.utc),
+            },
+            synchronize_session="fetch",
+        )
+    )
     db.commit()
 
     return get_scheduler_status(db)
@@ -91,10 +112,21 @@ def start_scheduler(
 
 @router.post("/scheduler/stop", response_model=SchedulerStatusResponse)
 def stop_scheduler(db: Session = Depends(get_db)):
-    configs = db.query(ScheduleConfig).join(Niche).filter(Niche.is_active.is_(True)).all()
-    for config in configs:
-        config.is_enabled = False
-        config.updated_at = datetime.now(timezone.utc)
+    (
+        db.query(ScheduleConfig)
+        .filter(
+            ScheduleConfig.niche_id.in_(
+                db.query(Niche.id).filter(Niche.is_active.is_(True))
+            )
+        )
+        .update(
+            {
+                ScheduleConfig.is_enabled: False,
+                ScheduleConfig.updated_at: datetime.now(timezone.utc),
+            },
+            synchronize_session="fetch",
+        )
+    )
     db.commit()
 
     return get_scheduler_status(db)
@@ -151,23 +183,13 @@ def start_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(config)
 
-    niche = config.niche
     trend_count = (
         db.query(func.count(Trend.id))
         .filter(Trend.niche_id == niche_id, Trend.status == "active")
         .scalar()
     )
 
-    return NicheScheduleStatus(
-        niche_id=config.niche_id,
-        niche_name=niche.name if niche else "",
-        niche_slug=niche.slug if niche else "",
-        is_enabled=config.is_enabled,
-        interval_minutes=config.interval_minutes,
-        last_run_at=config.last_run_at,
-        next_run_at=config.next_run_at,
-        trend_count=trend_count,
-    )
+    return _build_niche_schedule_status(config, trend_count)
 
 
 @router.post("/scheduler/niche/{niche_id}/stop", response_model=NicheScheduleStatus)
@@ -181,23 +203,13 @@ def stop_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(config)
 
-    niche = config.niche
     trend_count = (
         db.query(func.count(Trend.id))
         .filter(Trend.niche_id == niche_id, Trend.status == "active")
         .scalar()
     )
 
-    return NicheScheduleStatus(
-        niche_id=config.niche_id,
-        niche_name=niche.name if niche else "",
-        niche_slug=niche.slug if niche else "",
-        is_enabled=config.is_enabled,
-        interval_minutes=config.interval_minutes,
-        last_run_at=config.last_run_at,
-        next_run_at=config.next_run_at,
-        trend_count=trend_count,
-    )
+    return _build_niche_schedule_status(config, trend_count)
 
 
 # ── Task endpoints ────────────────────────────────────────────────────
@@ -305,16 +317,25 @@ def delete_expired_trends(db: Session = Depends(get_db)):
 
 @router.get("/stats", response_model=DashboardStatsResponse)
 def get_dashboard_stats(db: Session = Depends(get_db)):
-    active_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active").scalar()
-    expired_trends = db.query(func.count(Trend.id)).filter(Trend.status == "expired").scalar()
-    researched_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active", Trend.research_done.is_(True)).scalar()
-    embedded_trends = db.query(func.count(Trend.id)).filter(Trend.status == "active", Trend.embedding.isnot(None)).scalar()
+    trend_stats = db.query(
+        func.count(case((Trend.status == "active", Trend.id))),
+        func.count(case((Trend.status == "expired", Trend.id))),
+        func.count(case((
+            (Trend.status == "active") & (Trend.research_done.is_(True)),
+            Trend.id,
+        ))),
+        func.count(case((
+            (Trend.status == "active") & (Trend.embedding.isnot(None)),
+            Trend.id,
+        ))),
+    ).first()
+
     total_niches = db.query(func.count(Niche.id)).filter(Niche.is_active.is_(True)).scalar()
 
     return DashboardStatsResponse(
-        active_trends=active_trends,
-        expired_trends=expired_trends,
-        researched_trends=researched_trends,
-        embedded_trends=embedded_trends,
+        active_trends=trend_stats[0],
+        expired_trends=trend_stats[1],
+        researched_trends=trend_stats[2],
+        embedded_trends=trend_stats[3],
         total_niches=total_niches,
     )

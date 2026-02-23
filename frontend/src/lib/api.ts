@@ -38,13 +38,17 @@ export function getNiches(): Promise<Niche[]> {
 
 export function getTrends(params?: {
   niche_id?: number;
-  trend_type?: string;
+  status?: string;
+  research_done?: boolean;
+  has_embedding?: boolean;
   limit?: number;
   offset?: number;
 }): Promise<TrendListResponse> {
   const searchParams = new URLSearchParams();
   if (params?.niche_id) searchParams.set("niche_id", String(params.niche_id));
-  if (params?.trend_type) searchParams.set("trend_type", params.trend_type);
+  if (params?.status) searchParams.set("status", String(params.status));
+  if (params?.research_done !== undefined) searchParams.set("research_done", String(params.research_done));
+  if (params?.has_embedding !== undefined) searchParams.set("has_embedding", String(params.has_embedding));
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));
   const qs = searchParams.toString();

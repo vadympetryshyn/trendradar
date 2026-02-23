@@ -7,6 +7,7 @@ class NicheResponse(BaseModel):
     id: int
     name: str
     slug: str
+    description: str = ""
     subreddits: list[str]
     is_active: bool
     created_at: datetime
@@ -18,6 +19,7 @@ class NicheDetailResponse(BaseModel):
     id: int
     name: str
     slug: str
+    description: str = ""
     subreddits: list[str]
     is_active: bool
     created_at: datetime

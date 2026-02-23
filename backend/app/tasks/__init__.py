@@ -34,6 +34,8 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None)
         task_record.celery_task_id = self.request.id
         db.commit()
 
+        logger.info(f"[Niche {niche_id}] Starting trend collection task (celery_id={self.request.id})")
+
         service = TrendCollectionService(db)
         result = service.collect_trends(niche_id)
 
@@ -58,11 +60,17 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None)
         logger.error(f"Collection failed for niche {niche_id}: {exc}")
 
         # Update task record with failure
-        if task_record:
-            task_record.status = "failed"
-            task_record.error_message = str(exc)[:500]
-            task_record.completed_at = datetime.now(timezone.utc)
-            db.commit()
+        try:
+            db.rollback()
+            if task_record:
+                task_record = db.query(CollectionTask).filter(CollectionTask.id == task_record.id).first()
+                if task_record:
+                    task_record.status = "failed"
+                    task_record.error_message = str(exc)[:500]
+                    task_record.completed_at = datetime.now(timezone.utc)
+                    db.commit()
+        except Exception as inner_exc:
+            logger.error(f"Failed to update task record for niche {niche_id}: {inner_exc}")
 
         try:
             self.retry(exc=exc)

@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 
 import httpx
@@ -16,10 +17,39 @@ class RedditService:
             follow_redirects=True,
         )
 
+    def _fetch_with_retry(self, url: str, max_retries: int = 3) -> httpx.Response:
+        for attempt in range(max_retries):
+            try:
+                response = self.client.get(url)
+                if response.status_code in (403, 429) or response.status_code >= 500:
+                    wait = (2 ** attempt) + random.random()
+                    logger.warning(
+                        f"Reddit returned {response.status_code} for {url}, "
+                        f"retrying in {wait:.1f}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait)
+                    continue
+                response.raise_for_status()
+                return response
+            except httpx.HTTPStatusError:
+                raise
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = (2 ** attempt) + random.random()
+                    logger.warning(f"Request failed for {url}: {e}, retrying in {wait:.1f}s")
+                    time.sleep(wait)
+                else:
+                    raise
+        # Final attempt without retry
+        response = self.client.get(url)
+        response.raise_for_status()
+        return response
+
     def fetch_subreddit_posts(self, subreddit: str) -> list[dict]:
         endpoints = [
-            (f"https://www.reddit.com/r/{subreddit}/hot.json?limit=25", "hot"),
-            (f"https://www.reddit.com/r/{subreddit}/rising.json?limit=10", "rising"),
+            (f"https://www.reddit.com/r/{subreddit}/hot.json?limit=20", "hot"),
+            (f"https://www.reddit.com/r/{subreddit}/rising.json?limit=20", "rising"),
+            (f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=20", "top"),
         ]
 
         seen_ids = set()
@@ -27,9 +57,9 @@ class RedditService:
 
         for url, trend_type in endpoints:
             try:
+                logger.info(f"Scraping r/{subreddit} [{trend_type}] ...")
                 time.sleep(2)
-                response = self.client.get(url)
-                response.raise_for_status()
+                response = self._fetch_with_retry(url)
                 data = response.json()
 
                 for child in data.get("data", {}).get("children", []):
@@ -43,7 +73,7 @@ class RedditService:
 
                     selftext = post.get("selftext", "") or ""
                     if len(selftext) > 2000:
-                        selftext = selftext[:2000]
+                        selftext = selftext[:2000].rsplit(" ", 1)[0]
 
                     posts.append({
                         "id": post_id,
@@ -53,17 +83,21 @@ class RedditService:
                         "num_comments": post.get("num_comments", 0),
                         "subreddit": post.get("subreddit", subreddit),
                         "permalink": post.get("permalink", ""),
+                        "created_utc": post.get("created_utc", 0),
                         "trend_type": trend_type,
                     })
             except Exception as e:
                 logger.warning(f"Failed to fetch {url}: {e}")
                 continue
 
+        logger.info(f"Scraped r/{subreddit}: {len(posts)} unique posts collected")
         return posts
 
     def fetch_all_subreddits(self, subreddits: list[str]) -> list[dict]:
         all_posts = []
         fetched_subreddits = []
+
+        logger.info(f"Starting Reddit scraping for {len(subreddits)} subreddits: {', '.join(subreddits)}")
 
         for subreddit in subreddits:
             try:
@@ -76,6 +110,7 @@ class RedditService:
                 logger.warning(f"Skipping r/{subreddit}: {e}")
                 continue
 
+        logger.info(f"Reddit scraping complete: {len(all_posts)} total posts from {len(fetched_subreddits)} subreddits")
         return all_posts
 
     def close(self):

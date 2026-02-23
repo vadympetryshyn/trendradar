@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getTrends, getNiches, deleteTrendsBulk } from "@/lib/api";
+import { SENTIMENT_COLORS } from "@/lib/constants";
 import type { Niche, Trend } from "@/lib/types";
 
 export default function TrendsPage() {
@@ -35,12 +36,12 @@ export default function TrendsPage() {
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [nicheFilter, setNicheFilter] = useState<number | undefined>();
-  const [typeFilter, setTypeFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [researchedFilter, setResearchedFilter] = useState<string>("all");
   const [embeddingFilter, setEmbeddingFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const limit = 20;
 
   useEffect(() => {
@@ -51,30 +52,28 @@ export default function TrendsPage() {
     setLoading(true);
     getTrends({
       niche_id: nicheFilter,
-      trend_type: typeFilter,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      research_done:
+        researchedFilter === "yes"
+          ? true
+          : researchedFilter === "no"
+            ? false
+            : undefined,
+      has_embedding:
+        embeddingFilter === "yes"
+          ? true
+          : embeddingFilter === "no"
+            ? false
+            : undefined,
       limit,
       offset,
     })
       .then((data) => {
-        let items = data.items;
-        if (statusFilter !== "all") {
-          items = items.filter((t) => t.status === statusFilter);
-        }
-        if (researchedFilter === "yes") {
-          items = items.filter((t) => t.research_done);
-        } else if (researchedFilter === "no") {
-          items = items.filter((t) => !t.research_done);
-        }
-        if (embeddingFilter === "yes") {
-          items = items.filter((t) => t.has_embedding);
-        } else if (embeddingFilter === "no") {
-          items = items.filter((t) => !t.has_embedding);
-        }
-        setTrends(items);
+        setTrends(data.items);
         setTotal(data.total);
       })
       .finally(() => setLoading(false));
-  }, [nicheFilter, typeFilter, offset, statusFilter, researchedFilter, embeddingFilter]);
+  }, [nicheFilter, offset, statusFilter, researchedFilter, embeddingFilter]);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
@@ -104,13 +103,14 @@ export default function TrendsPage() {
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       await deleteTrendsBulk(Array.from(selectedIds));
       setTrends((prev) => prev.filter((t) => !selectedIds.has(t.id)));
       setTotal((prev) => prev - selectedIds.size);
       setSelectedIds(new Set());
     } catch {
-      alert("Failed to delete trends");
+      setDeleteError("Failed to delete trends");
     } finally {
       setDeleting(false);
     }
@@ -157,6 +157,12 @@ export default function TrendsPage() {
         )}
       </div>
 
+      {deleteError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          {deleteError}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <Badge
@@ -179,26 +185,6 @@ export default function TrendsPage() {
 
         <div className="h-6 w-px bg-border mx-1" />
 
-        {["all", "hot", "rising"].map((type) => (
-          <Badge
-            key={type}
-            variant={
-              (type === "all" && !typeFilter) || typeFilter === type
-                ? "default"
-                : "outline"
-            }
-            className="cursor-pointer"
-            onClick={() => {
-              setTypeFilter(type === "all" ? undefined : type);
-              setOffset(0);
-            }}
-          >
-            {type === "all" ? "All Types" : type}
-          </Badge>
-        ))}
-
-        <div className="h-6 w-px bg-border mx-1" />
-
         {["all", "active", "expired"].map((s) => (
           <Badge
             key={s}
@@ -214,7 +200,7 @@ export default function TrendsPage() {
 
         {["all", "yes", "no"].map((r) => (
           <Badge
-            key={r}
+            key={`embed-${r}`}
             variant={embeddingFilter === r ? "default" : "outline"}
             className="cursor-pointer"
             onClick={() => { setEmbeddingFilter(r); setOffset(0); }}
@@ -231,7 +217,7 @@ export default function TrendsPage() {
 
         {["all", "yes", "no"].map((r) => (
           <Badge
-            key={r}
+            key={`research-${r}`}
             variant={researchedFilter === r ? "default" : "outline"}
             className="cursor-pointer"
             onClick={() => { setResearchedFilter(r); setOffset(0); }}
@@ -262,7 +248,6 @@ export default function TrendsPage() {
                     />
                   </th>
                   <th className="pb-2 pr-4 font-medium">Title</th>
-                  <th className="pb-2 pr-4 font-medium">Type</th>
                   <th className="pb-2 pr-4 font-medium">Sentiment</th>
                   <th className="pb-2 pr-4 font-medium">Category</th>
                   <th className="pb-2 pr-4 font-medium text-right">Score</th>
@@ -292,23 +277,7 @@ export default function TrendsPage() {
                       <Badge
                         variant="outline"
                         className={
-                          trend.trend_type === "rising"
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-blue-100 text-blue-800"
-                        }
-                      >
-                        {trend.trend_type}
-                      </Badge>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Badge
-                        variant="outline"
-                        className={
-                          trend.sentiment === "positive"
-                            ? "bg-green-100 text-green-800"
-                            : trend.sentiment === "negative"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
+                          SENTIMENT_COLORS[trend.sentiment] || SENTIMENT_COLORS.neutral
                         }
                       >
                         {trend.sentiment}
@@ -353,7 +322,7 @@ export default function TrendsPage() {
                 {trends.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={9}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No trends found.

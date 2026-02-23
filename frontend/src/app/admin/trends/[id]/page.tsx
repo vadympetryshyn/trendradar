@@ -14,10 +14,7 @@ import { Button } from "@/components/ui/button";
 import { getTrend } from "@/lib/api";
 import { MarkdownContent } from "@/components/markdown-content";
 import type { TrendDetail } from "@/lib/types";
-
-function stripSubredditPrefix(sub: string): string {
-  return sub.replace(/^\/?(r\/)+/, "");
-}
+import { stripSubredditPrefix } from "@/lib/format";
 
 export default function TrendDetailPage() {
   const params = useParams();
@@ -73,16 +70,6 @@ export default function TrendDetailPage() {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">{trend.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
-            <Badge
-              variant="outline"
-              className={
-                trend.trend_type === "rising"
-                  ? "bg-orange-100 text-orange-800 border-orange-200"
-                  : "bg-blue-100 text-blue-800 border-blue-200"
-              }
-            >
-              {trend.trend_type}
-            </Badge>
             <Badge
               variant="outline"
               className={
@@ -213,7 +200,7 @@ export default function TrendDetailPage() {
                   return (
                     <a
                       key={sub}
-                      href={`https://www.reddit.com/r/${name}/${trend.trend_type === "rising" ? "rising" : "hot"}/`}
+                      href={`https://www.reddit.com/r/${name}/`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

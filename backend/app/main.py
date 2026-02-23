@@ -16,13 +16,6 @@ async def lifespan(app: FastAPI):
 
     Base.metadata.create_all(bind=engine)
 
-    # Add new columns to existing tables
-    with engine.connect() as conn:
-        conn.execute(text("""
-            ALTER TABLE trends ADD COLUMN IF NOT EXISTS research_citations VARCHAR[] DEFAULT '{}'
-        """))
-        conn.commit()
-
     db = SessionLocal()
     try:
         from app.seed import seed_data

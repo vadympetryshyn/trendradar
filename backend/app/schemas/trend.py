@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class TrendListItem(BaseModel):
@@ -8,7 +8,7 @@ class TrendListItem(BaseModel):
     niche_id: int
     title: str
     summary: str
-    trend_type: str
+    source_post_ids: list[str] = []
     status: str
     sentiment: str
     sentiment_score: float
@@ -24,13 +24,18 @@ class TrendListItem(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def stringify_id(cls, v: object) -> str:
+        return str(v)
+
 
 class TrendDetail(BaseModel):
     id: str
     niche_id: int
     title: str
     summary: str
-    trend_type: str
+    source_post_ids: list[str] = []
     status: str
     sentiment: str
     sentiment_score: float
@@ -50,6 +55,11 @@ class TrendDetail(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def stringify_id(cls, v: object) -> str:
+        return str(v)
+
 
 class TrendListResponse(BaseModel):
     items: list[TrendListItem]
@@ -68,7 +78,7 @@ class TrendSearchResult(BaseModel):
     id: str
     title: str
     summary: str
-    trend_type: str
+    source_post_ids: list[str] = []
     sentiment: str
     category: str
     relevance_score: float
@@ -76,6 +86,11 @@ class TrendSearchResult(BaseModel):
     collected_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def stringify_id(cls, v: object) -> str:
+        return str(v)
 
 
 class TrendSearchResponse(BaseModel):
