@@ -11,7 +11,6 @@ class TrendListItem(BaseModel):
     source_post_ids: list[str] = []
     status: str
     sentiment: str
-    sentiment_score: float
     category: str
     key_points: list[str]
     source_urls: list[str]
@@ -38,7 +37,6 @@ class TrendDetail(BaseModel):
     source_post_ids: list[str] = []
     status: str
     sentiment: str
-    sentiment_score: float
     category: str
     key_points: list[str]
     source_urls: list[str]

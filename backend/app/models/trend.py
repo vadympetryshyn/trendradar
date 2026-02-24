@@ -26,7 +26,6 @@ class Trend(Base):
     source_post_ids: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
     sentiment: Mapped[str] = mapped_column(String(20), nullable=False, default="neutral")
-    sentiment_score: Mapped[float] = mapped_column(Float, default=0.0)
     category: Mapped[str] = mapped_column(String(100), nullable=False, default="General")
     key_points: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     source_urls: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)

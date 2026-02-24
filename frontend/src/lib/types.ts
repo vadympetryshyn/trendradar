@@ -16,7 +16,6 @@ export interface Trend {
   source_post_ids: string[];
   status: "active" | "expired";
   sentiment: string;
-  sentiment_score: number;
   category: string;
   key_points: string[];
   source_urls: string[];

@@ -52,15 +52,14 @@ Each post includes a [type:hot], [type:rising], or [type:top] tag indicating its
 
 For each trend, provide:
 - title: A concise title for the trend
-- summary: A 2-3 sentence description of what this trend is about
+- summary: A 2-5 sentence description of what this trend is about
 - sentiment: One of "positive", "negative", "neutral", or "mixed"
-- sentiment_score: A float from -1.0 (very negative) to 1.0 (very positive)
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
-- key_points: An array of 2-4 key points about this trend
+- key_points: An array of 2-5 key points about this trend
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
 
-Identify between 5 and 15 trends, ordered by significance (highest first).
+Identify between 5 and 20 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -69,7 +68,6 @@ Return JSON in this exact format:
       "title": "string",
       "summary": "string",
       "sentiment": "string",
-      "sentiment_score": 0.0,
       "category": "string",
       "key_points": ["string"],
       "source_subreddits": ["string"],

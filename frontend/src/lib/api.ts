@@ -70,7 +70,7 @@ export function searchTrends(
     body: JSON.stringify({
       query,
       niche_id: nicheId,
-      limit: limit || 10,
+      limit: limit || 20,
     }),
   });
 }

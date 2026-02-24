@@ -141,7 +141,6 @@ class TrendCollectionService:
                     source_post_ids=source_post_ids,
                     status="active",
                     sentiment=trend_data.get("sentiment", "neutral"),
-                    sentiment_score=float(trend_data.get("sentiment_score", 0.0)),
                     category=trend_data.get("category", "General"),
                     key_points=trend_data.get("key_points", []),
                     source_urls=source_urls,

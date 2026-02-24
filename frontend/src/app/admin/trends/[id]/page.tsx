@@ -90,9 +90,15 @@ export default function TrendDetailPage() {
                     : "bg-gray-100 text-gray-800"
               }
             >
-              {trend.sentiment} ({trend.sentiment_score.toFixed(2)})
+              {trend.sentiment}
             </Badge>
             <Badge variant="secondary">{trend.category}</Badge>
+            <Badge
+              variant="outline"
+              className="bg-blue-100 text-blue-800 border-blue-200"
+            >
+              {trend.mention_count} {trend.mention_count === 1 ? "mention" : "mentions"}
+            </Badge>
             {trend.research_done && (
               <Badge
                 variant="outline"
