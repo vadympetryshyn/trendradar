@@ -8,6 +8,7 @@ class CollectionTaskResponse(BaseModel):
     niche_id: int
     niche_name: str
     niche_slug: str
+    collection_type: str = "now"
     celery_task_id: str | None
     status: str
     trends_created: int

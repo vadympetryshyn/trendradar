@@ -28,15 +28,11 @@ Each niche has:
 
 ### What we collect
 
-For each niche, we scrape **two Reddit feeds per subreddit**:
-- **Hot** — currently popular posts
-- **Rising** — posts gaining traction quickly
-
-Each trend must be tagged with `trnd type: "hot" | "rising"` to indicate where it was found.
+For each niche, we scrape **hot Reddit posts per subreddit**.
 
 ### Scheduling
 
-- Default interval: **every 30 minutes**, all niches, both hot and rising
+- Default interval: **every 30 minutes**, all niches
 - Configurable interval via admin UI (dropdown: 15min / 30min / 1h / 2h / 5h / 12h/ 24h)
 - Admin can:
   - Start/stop the global scheduler
@@ -64,7 +60,6 @@ Trend:
   title: string
   subreddit: string
   niche_id: string
-  trend_type: "hot" | "rising"
   status: "active" | "expired"
   url: string (link to Reddit post)
   upvotes: int
@@ -143,7 +138,6 @@ List active trends with filters.
 
 Query params:
 - `niche_id` (optional) — filter by niche
-- `trend_type` (optional) — `"hot"` | `"rising"`
 - `limit` (default 20, max 100)
 - `offset` (default 0)
 
@@ -164,7 +158,6 @@ Body:
 {
   "query": "seasonal allergies in children",
   "niche_slug": "ai",           // optional, filter by niche
-  "trend_type": "hot",             // optional
   "limit": 10
 }
 ```
@@ -178,7 +171,6 @@ Get trends recommended based on a text description (used by Postory to pass user
 
 Query params:
 - `description` — free-text niche description (e.g., "AI tools for developers")
-- `trend_type` (optional) — `"hot"` | `"rising"`
 - `limit` (default 10)
 
 Backend generates embedding from `description`, same as search but framed as recommendations.
@@ -242,7 +234,7 @@ TrendsRadar must have a **web-based admin UI** (not just API). This is for devel
 
 #### Trends Browser
 - Table/list of all trends
-- Filters: niche, trend type (hot/rising), status (active/expired), researched (yes/no)
+- Filters: niche, collection type (now/daily/weekly), status (active/expired), researched (yes/no)
 - Search bar (text search by title)
 - Click on trend → detail view with full context_summary
 - Button to manually trigger web research for a trend
@@ -276,7 +268,7 @@ TrendsRadar must have a **web-based admin UI** (not just API). This is for devel
 | Decision | Choice |
 |----------|--------|
 | Niches for now | AI only (others removed) |
-| Reddit feeds | Hot + Rising per subreddit |
+| Reddit feeds | Hot per subreddit (now), Top per subreddit (daily/weekly) |
 | Scrape interval | Every 30 min (configurable) |
 | Web research | On-demand only (when trend requested by ID) |
 | Old trends | Mark as expired, delete after 72h |

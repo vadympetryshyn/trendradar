@@ -37,6 +37,7 @@ export default function TrendsPage() {
   const [offset, setOffset] = useState(0);
   const [nicheFilter, setNicheFilter] = useState<number | undefined>();
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [collectionTypeFilter, setCollectionTypeFilter] = useState<string>("all");
   const [researchedFilter, setResearchedFilter] = useState<string>("all");
   const [embeddingFilter, setEmbeddingFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -53,6 +54,7 @@ export default function TrendsPage() {
     getTrends({
       niche_id: nicheFilter,
       status: statusFilter !== "all" ? statusFilter : undefined,
+      collection_type: collectionTypeFilter !== "all" ? collectionTypeFilter : undefined,
       research_done:
         researchedFilter === "yes"
           ? true
@@ -73,7 +75,7 @@ export default function TrendsPage() {
         setTotal(data.total);
       })
       .finally(() => setLoading(false));
-  }, [nicheFilter, offset, statusFilter, researchedFilter, embeddingFilter]);
+  }, [nicheFilter, offset, statusFilter, collectionTypeFilter, researchedFilter, embeddingFilter]);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
@@ -185,6 +187,19 @@ export default function TrendsPage() {
 
         <div className="h-6 w-px bg-border mx-1" />
 
+        {["all", "now", "daily", "weekly"].map((ct) => (
+          <Badge
+            key={`ct-${ct}`}
+            variant={collectionTypeFilter === ct ? "default" : "outline"}
+            className="cursor-pointer"
+            onClick={() => { setCollectionTypeFilter(ct); setOffset(0); }}
+          >
+            {ct === "all" ? "All Types" : ct === "now" ? "Now" : ct === "daily" ? "Daily" : "Weekly"}
+          </Badge>
+        ))}
+
+        <div className="h-6 w-px bg-border mx-1" />
+
         {["all", "active", "expired"].map((s) => (
           <Badge
             key={s}
@@ -248,6 +263,7 @@ export default function TrendsPage() {
                     />
                   </th>
                   <th className="pb-2 pr-4 font-medium">Title</th>
+                  <th className="pb-2 pr-4 font-medium">Type</th>
                   <th className="pb-2 pr-4 font-medium">Sentiment</th>
                   <th className="pb-2 pr-4 font-medium">Category</th>
                   <th className="pb-2 pr-4 font-medium text-right">Score</th>
@@ -272,6 +288,11 @@ export default function TrendsPage() {
                     </td>
                     <td className="py-3 pr-4 font-medium max-w-[300px] truncate">
                       {trend.title}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <Badge variant="outline" className="text-xs">
+                        {trend.collection_type}
+                      </Badge>
                     </td>
                     <td className="py-3 pr-4">
                       <Badge
@@ -322,7 +343,7 @@ export default function TrendsPage() {
                 {trends.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No trends found.

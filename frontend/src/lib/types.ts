@@ -22,6 +22,7 @@ export interface Trend {
   source_subreddits: string[];
   mention_count: number;
   relevance_score: number;
+  collection_type: "now" | "daily" | "weekly";
   research_done: boolean;
   has_embedding: boolean;
   collected_at: string;
@@ -49,6 +50,7 @@ export interface TrendSearchResult {
   sentiment: string;
   category: string;
   relevance_score: number;
+  collection_type: "now" | "daily" | "weekly";
   similarity: number;
   collected_at: string;
 }
@@ -62,6 +64,7 @@ export interface NicheScheduleStatus {
   niche_id: number;
   niche_name: string;
   niche_slug: string;
+  collection_type: "now" | "daily" | "weekly";
   is_enabled: boolean;
   interval_minutes: number;
   last_run_at: string | null;
@@ -93,6 +96,7 @@ export interface CollectionTask {
   niche_id: number;
   niche_name: string;
   niche_slug: string;
+  collection_type: "now" | "daily" | "weekly";
   celery_task_id: string | null;
   status: "queued" | "running" | "completed" | "failed" | "stopped";
   trends_created: number;

@@ -13,6 +13,7 @@ class Trend(Base):
     __tablename__ = "trends"
     __table_args__ = (
         Index("ix_trends_niche_id_status", "niche_id", "status"),
+        Index("ix_trends_niche_collection_status", "niche_id", "collection_type", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -32,6 +33,7 @@ class Trend(Base):
     source_subreddits: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     mention_count: Mapped[int] = mapped_column(Integer, default=0)
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0)
+    collection_type: Mapped[str] = mapped_column(String(20), nullable=False, default="now", server_default="now")
     context_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     research_citations: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     research_done: Mapped[bool] = mapped_column(Boolean, default=False, index=True)

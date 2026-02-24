@@ -33,7 +33,7 @@ export default function AdminPage() {
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [recentTasks, setRecentTasks] = useState<CollectionTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [runningNiches, setRunningNiches] = useState<Set<number>>(new Set());
+  const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
   const [runningAll, setRunningAll] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -47,13 +47,13 @@ export default function AdminPage() {
       setScheduler(schedulerData);
       setRecentTasks(tasksData.items);
 
-      // Check which niches have active tasks
-      const activeNicheIds = new Set(
+      // Check which niche+collection_type combos have active tasks
+      const activeKeys = new Set(
         tasksData.items
           .filter((t) => t.status === "queued" || t.status === "running")
-          .map((t) => t.niche_id)
+          .map((t) => `${t.niche_id}-${t.collection_type}`)
       );
-      setRunningNiches(activeNicheIds);
+      setRunningNiches(activeKeys);
       setRunningAll(false);
     });
   }, []);
@@ -87,21 +87,22 @@ export default function AdminPage() {
     setScheduler(result);
   };
 
-  const handleRunNow = async (nicheId?: number) => {
-    if (nicheId) {
-      setRunningNiches((prev) => new Set(prev).add(nicheId));
+  const handleRunNow = async (nicheId?: number, collectionType?: string) => {
+    if (nicheId && collectionType) {
+      const key = `${nicheId}-${collectionType}`;
+      setRunningNiches((prev) => new Set(prev).add(key));
     } else {
       setRunningAll(true);
     }
     try {
-      await runNow(nicheId);
-      // Start polling to pick up new tasks
+      await runNow(nicheId, collectionType);
       setTimeout(fetchData, 1000);
     } catch {
-      if (nicheId) {
+      if (nicheId && collectionType) {
+        const key = `${nicheId}-${collectionType}`;
         setRunningNiches((prev) => {
           const next = new Set(prev);
-          next.delete(nicheId);
+          next.delete(key);
           return next;
         });
       } else {
@@ -110,20 +111,20 @@ export default function AdminPage() {
     }
   };
 
-  const handleToggleNiche = async (nicheId: number, enabled: boolean) => {
+  const handleToggleNiche = async (nicheId: number, collectionType: string, enabled: boolean) => {
     const result = enabled
-      ? await stopNicheSchedule(nicheId)
-      : await startNicheSchedule(nicheId);
+      ? await stopNicheSchedule(nicheId, collectionType)
+      : await startNicheSchedule(nicheId, collectionType);
 
     setScheduler((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         running: prev.niches.some(
-          (n) => (n.niche_id === nicheId ? result.is_enabled : n.is_enabled)
+          (n) => (n.niche_id === nicheId && n.collection_type === collectionType ? result.is_enabled : n.is_enabled)
         ),
         niches: prev.niches.map((n) =>
-          n.niche_id === nicheId ? result : n
+          n.niche_id === nicheId && n.collection_type === collectionType ? result : n
         ),
       };
     });
@@ -244,15 +245,19 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {scheduler.niches.map((niche) => {
-              const isRunning = runningNiches.has(niche.niche_id);
+              const nicheKey = `${niche.niche_id}-${niche.collection_type}`;
+              const isRunning = runningNiches.has(nicheKey);
               return (
                 <div
-                  key={niche.niche_id}
+                  key={nicheKey}
                   className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{niche.niche_name}</span>
+                      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                        {niche.collection_type}
+                      </span>
                       <span className="text-xs text-muted-foreground">
                         {niche.trend_count} active trends
                       </span>
@@ -276,7 +281,7 @@ export default function AdminPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleRunNow(niche.niche_id)}
+                      onClick={() => handleRunNow(niche.niche_id, niche.collection_type)}
                       disabled={isRunning || runningAll}
                     >
                       {isRunning ? "Running..." : "Run"}
@@ -285,7 +290,7 @@ export default function AdminPage() {
                       size="sm"
                       variant={niche.is_enabled ? "default" : "outline"}
                       onClick={() =>
-                        handleToggleNiche(niche.niche_id, niche.is_enabled)
+                        handleToggleNiche(niche.niche_id, niche.collection_type, niche.is_enabled)
                       }
                       className={
                         niche.is_enabled

@@ -39,6 +39,7 @@ export function getNiches(): Promise<Niche[]> {
 export function getTrends(params?: {
   niche_id?: number;
   status?: string;
+  collection_type?: string;
   research_done?: boolean;
   has_embedding?: boolean;
   limit?: number;
@@ -47,6 +48,7 @@ export function getTrends(params?: {
   const searchParams = new URLSearchParams();
   if (params?.niche_id) searchParams.set("niche_id", String(params.niche_id));
   if (params?.status) searchParams.set("status", String(params.status));
+  if (params?.collection_type) searchParams.set("collection_type", params.collection_type);
   if (params?.research_done !== undefined) searchParams.set("research_done", String(params.research_done));
   if (params?.has_embedding !== undefined) searchParams.set("has_embedding", String(params.has_embedding));
   if (params?.limit) searchParams.set("limit", String(params.limit));
@@ -105,25 +107,30 @@ export function stopScheduler(): Promise<SchedulerStatus> {
   return fetchApi("/api/v1/admin/scheduler/stop", { method: "POST" });
 }
 
-export function runNow(nicheId?: number): Promise<ManualTriggerResponse> {
+export function runNow(nicheId?: number, collectionType?: string): Promise<ManualTriggerResponse> {
   return fetchApi("/api/v1/admin/scheduler/run", {
     method: "POST",
-    body: JSON.stringify({ niche_id: nicheId || null }),
+    body: JSON.stringify({
+      niche_id: nicheId || null,
+      collection_type: collectionType || null,
+    }),
   });
 }
 
 export function startNicheSchedule(
-  nicheId: number
+  nicheId: number,
+  collectionType: string = "now"
 ): Promise<NicheScheduleStatus> {
-  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/start`, {
+  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/start?collection_type=${collectionType}`, {
     method: "POST",
   });
 }
 
 export function stopNicheSchedule(
-  nicheId: number
+  nicheId: number,
+  collectionType: string = "now"
 ): Promise<NicheScheduleStatus> {
-  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/stop`, {
+  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/stop?collection_type=${collectionType}`, {
     method: "POST",
   });
 }

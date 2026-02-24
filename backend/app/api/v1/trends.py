@@ -29,6 +29,7 @@ def _build_search_result(trend: Trend, distance: float) -> TrendSearchResult:
         sentiment=trend.sentiment,
         category=trend.category,
         relevance_score=trend.relevance_score,
+        collection_type=trend.collection_type,
         similarity=similarity,
         collected_at=trend.collected_at,
     )
@@ -38,6 +39,7 @@ def _build_search_result(trend: Trend, distance: float) -> TrendSearchResult:
 def list_trends(
     niche_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
+    collection_type: Optional[str] = Query(None),
     research_done: Optional[bool] = Query(None),
     has_embedding: Optional[bool] = Query(None),
     limit: int = Query(20, ge=1, le=100),
@@ -53,6 +55,9 @@ def list_trends(
 
     if niche_id is not None:
         query = query.filter(Trend.niche_id == niche_id)
+
+    if collection_type is not None:
+        query = query.filter(Trend.collection_type == collection_type)
 
     if research_done is not None:
         query = query.filter(Trend.research_done.is_(research_done))

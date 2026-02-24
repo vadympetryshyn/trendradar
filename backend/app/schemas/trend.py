@@ -17,6 +17,7 @@ class TrendListItem(BaseModel):
     source_subreddits: list[str]
     mention_count: int
     relevance_score: float
+    collection_type: str
     research_done: bool
     has_embedding: bool
     collected_at: datetime
@@ -43,6 +44,7 @@ class TrendDetail(BaseModel):
     source_subreddits: list[str]
     mention_count: int
     relevance_score: float
+    collection_type: str
     context_summary: str | None
     research_citations: list[str]
     research_done: bool
@@ -80,6 +82,7 @@ class TrendSearchResult(BaseModel):
     sentiment: str
     category: str
     relevance_score: float
+    collection_type: str = "now"
     similarity: float
     collected_at: datetime
 

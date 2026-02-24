@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -8,8 +8,12 @@ from app.database import Base
 
 class ScheduleConfig(Base):
     __tablename__ = "schedule_configs"
+    __table_args__ = (
+        UniqueConstraint("niche_id", "collection_type", name="uq_schedule_niche_collection"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    collection_type: Mapped[str] = mapped_column(String(20), nullable=False, default="now", server_default="now")
     niche_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("niches.id"), nullable=False, index=True
     )

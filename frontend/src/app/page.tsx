@@ -8,12 +8,21 @@ import { SearchResultCard } from "@/components/search-result-card";
 import { getTrends, getNiches, searchTrends } from "@/lib/api";
 import type { Niche, Trend, TrendSearchResult } from "@/lib/types";
 
+const COLLECTION_TABS = [
+  { value: "now" as const, label: "Trending Now" },
+  { value: "daily" as const, label: "Today's Trends" },
+  { value: "weekly" as const, label: "This Week" },
+];
+
 export default function Home() {
   const [niches, setNiches] = useState<Niche[]>([]);
   const [trends, setTrends] = useState<Trend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNicheId, setSelectedNicheId] = useState<number | undefined>();
+
+  // Collection type filter
+  const [collectionType, setCollectionType] = useState<"now" | "daily" | "weekly">("now");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,12 +51,13 @@ export default function Home() {
 
     getTrends({
       niche_id: selectedNicheId,
+      collection_type: collectionType,
       limit: 50,
     })
       .then((data) => setTrends(data.items))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [selectedNicheId, isSearching]);
+  }, [selectedNicheId, isSearching, collectionType]);
 
   const handleSearch = () => {
     if (searchQuery.trim().length < 2) return;
@@ -65,6 +75,10 @@ export default function Home() {
     setSearchQuery("");
     setSearchResults([]);
     setHasSearched(false);
+  };
+
+  const handleCollectionTypeChange = (ct: "now" | "daily" | "weekly") => {
+    setCollectionType(ct);
   };
 
   return (
@@ -137,6 +151,27 @@ export default function Home() {
           Search
         </button>
       </div>
+
+      {/* Collection type tabs (hidden during search) */}
+      {!isSearching && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {COLLECTION_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => handleCollectionTypeChange(tab.value)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  collectionType === tab.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Niche filter (hidden during search) */}
       {!isSearching && niches.length > 1 && (

@@ -55,7 +55,7 @@ export default function TasksPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
-  const [runningNiches, setRunningNiches] = useState<Set<number>>(new Set());
+  const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const perPage = 20;
 
@@ -75,12 +75,12 @@ export default function TasksPage() {
       setTotal(tasksData.total);
       setScheduler(schedulerData);
 
-      const activeNicheIds = new Set(
+      const activeKeys = new Set(
         tasksData.items
           .filter((t) => IN_PROGRESS.includes(t.status))
-          .map((t) => t.niche_id)
+          .map((t) => `${t.niche_id}-${t.collection_type}`)
       );
-      setRunningNiches(activeNicheIds);
+      setRunningNiches(activeKeys);
     });
   }, [page, statusFilter]);
 
@@ -129,15 +129,16 @@ export default function TasksPage() {
     }
   };
 
-  const handleRunNiche = async (nicheId: number) => {
-    setRunningNiches((prev) => new Set(prev).add(nicheId));
+  const handleRunNiche = async (nicheId: number, collectionType: string) => {
+    const key = `${nicheId}-${collectionType}`;
+    setRunningNiches((prev) => new Set(prev).add(key));
     try {
-      await runNow(nicheId);
+      await runNow(nicheId, collectionType);
       setTimeout(fetchAll, 1000);
     } catch {
       setRunningNiches((prev) => {
         const next = new Set(prev);
-        next.delete(nicheId);
+        next.delete(key);
         return next;
       });
     }
@@ -241,15 +242,19 @@ export default function TasksPage() {
           <CardContent>
             <div className="space-y-2">
               {scheduler.niches.map((niche) => {
-                const isRunning = runningNiches.has(niche.niche_id);
+                const nicheKey = `${niche.niche_id}-${niche.collection_type}`;
+                const isRunning = runningNiches.has(nicheKey);
                 return (
                   <div
-                    key={niche.niche_id}
+                    key={`${niche.niche_id}-${niche.collection_type}`}
                     className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{niche.niche_name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {niche.collection_type}
+                        </Badge>
                         <span className="text-xs text-muted-foreground">
                           {niche.trend_count} active trends
                         </span>
@@ -269,7 +274,7 @@ export default function TasksPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleRunNiche(niche.niche_id)}
+                      onClick={() => handleRunNiche(niche.niche_id, niche.collection_type)}
                       disabled={isRunning}
                     >
                       {isRunning ? "Running..." : "Run"}

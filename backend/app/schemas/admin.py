@@ -7,6 +7,7 @@ class NicheScheduleStatus(BaseModel):
     niche_id: int
     niche_name: str
     niche_slug: str
+    collection_type: str = "now"
     is_enabled: bool
     interval_minutes: int
     last_run_at: datetime | None
@@ -25,6 +26,7 @@ class SchedulerStartRequest(BaseModel):
 
 class SchedulerRunRequest(BaseModel):
     niche_id: int | None = None
+    collection_type: str | None = None
 
 
 class ManualTriggerResponse(BaseModel):

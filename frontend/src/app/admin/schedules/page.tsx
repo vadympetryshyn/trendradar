@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -40,7 +41,7 @@ export default function SchedulerPage() {
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedInterval, setSelectedInterval] = useState("60");
-  const [runningNiche, setRunningNiche] = useState<number | null>(null);
+  const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getSchedulerStatus()
@@ -58,31 +59,36 @@ export default function SchedulerPage() {
     setScheduler(result);
   };
 
-  const handleToggleNiche = async (nicheId: number, enabled: boolean) => {
+  const handleToggleNiche = async (nicheId: number, collectionType: string, enabled: boolean) => {
     const result = enabled
-      ? await stopNicheSchedule(nicheId)
-      : await startNicheSchedule(nicheId);
+      ? await stopNicheSchedule(nicheId, collectionType)
+      : await startNicheSchedule(nicheId, collectionType);
 
     setScheduler((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         running: prev.niches.some(
-          (n) => (n.niche_id === nicheId ? result.is_enabled : n.is_enabled)
+          (n) => (n.niche_id === nicheId && n.collection_type === collectionType ? result.is_enabled : n.is_enabled)
         ),
         niches: prev.niches.map((n) =>
-          n.niche_id === nicheId ? result : n
+          n.niche_id === nicheId && n.collection_type === collectionType ? result : n
         ),
       };
     });
   };
 
-  const handleRunNiche = async (nicheId: number) => {
-    setRunningNiche(nicheId);
+  const handleRunNiche = async (nicheId: number, collectionType: string) => {
+    const key = `${nicheId}-${collectionType}`;
+    setRunningNiches((prev) => new Set(prev).add(key));
     try {
-      await runNow(nicheId);
+      await runNow(nicheId, collectionType);
     } finally {
-      setRunningNiche(null);
+      setRunningNiches((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -167,6 +173,7 @@ export default function SchedulerPage() {
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="pb-2 pr-4 font-medium">Niche</th>
+                  <th className="pb-2 pr-4 font-medium">Type</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
                   <th className="pb-2 pr-4 font-medium">Interval</th>
                   <th className="pb-2 pr-4 font-medium text-right">
@@ -178,57 +185,64 @@ export default function SchedulerPage() {
                 </tr>
               </thead>
               <tbody>
-                {scheduler.niches.map((niche) => (
-                  <tr key={niche.niche_id} className="border-b last:border-0">
-                    <td className="py-3 pr-4 font-medium">
-                      {niche.niche_name}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Button
-                        size="sm"
-                        variant={niche.is_enabled ? "default" : "outline"}
-                        onClick={() =>
-                          handleToggleNiche(niche.niche_id, niche.is_enabled)
-                        }
-                        className={
-                          niche.is_enabled
-                            ? "bg-green-600 hover:bg-green-700 text-white"
-                            : ""
-                        }
-                      >
-                        {niche.is_enabled ? "Enabled" : "Disabled"}
-                      </Button>
-                    </td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      Every {niche.interval_minutes} min
-                    </td>
-                    <td className="py-3 pr-4 text-right tabular-nums">
-                      {niche.trend_count}
-                    </td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      {niche.last_run_at
-                        ? new Date(niche.last_run_at).toLocaleString()
-                        : "Never"}
-                    </td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      {niche.is_enabled && niche.next_run_at
-                        ? new Date(niche.next_run_at).toLocaleString()
-                        : "—"}
-                    </td>
-                    <td className="py-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRunNiche(niche.niche_id)}
-                        disabled={runningNiche === niche.niche_id}
-                      >
-                        {runningNiche === niche.niche_id
-                          ? "Running..."
-                          : "Run Now"}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {scheduler.niches.map((niche) => {
+                  const nicheKey = `${niche.niche_id}-${niche.collection_type}`;
+                  const isRunning = runningNiches.has(nicheKey);
+                  return (
+                    <tr key={nicheKey} className="border-b last:border-0">
+                      <td className="py-3 pr-4 font-medium">
+                        {niche.niche_name}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Badge variant="outline" className="text-xs">
+                          {niche.collection_type}
+                        </Badge>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Button
+                          size="sm"
+                          variant={niche.is_enabled ? "default" : "outline"}
+                          onClick={() =>
+                            handleToggleNiche(niche.niche_id, niche.collection_type, niche.is_enabled)
+                          }
+                          className={
+                            niche.is_enabled
+                              ? "bg-green-600 hover:bg-green-700 text-white"
+                              : ""
+                          }
+                        >
+                          {niche.is_enabled ? "Enabled" : "Disabled"}
+                        </Button>
+                      </td>
+                      <td className="py-3 pr-4 text-muted-foreground">
+                        Every {niche.interval_minutes} min
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums">
+                        {niche.trend_count}
+                      </td>
+                      <td className="py-3 pr-4 text-muted-foreground">
+                        {niche.last_run_at
+                          ? new Date(niche.last_run_at).toLocaleString()
+                          : "Never"}
+                      </td>
+                      <td className="py-3 pr-4 text-muted-foreground">
+                        {niche.is_enabled && niche.next_run_at
+                          ? new Date(niche.next_run_at).toLocaleString()
+                          : "\u2014"}
+                      </td>
+                      <td className="py-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRunNiche(niche.niche_id, niche.collection_type)}
+                          disabled={isRunning}
+                        >
+                          {isRunning ? "Running..." : "Run Now"}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
-def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None):
+def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None, collection_type: str = "now"):
     from app.models import CollectionTask, ScheduleConfig
     from app.services.trend_collection_service import TrendCollectionService
 
@@ -22,6 +22,7 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None)
         if not task_record:
             task_record = CollectionTask(
                 niche_id=niche_id,
+                collection_type=collection_type,
                 celery_task_id=self.request.id,
                 status="running",
             )
@@ -34,10 +35,13 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None)
         task_record.celery_task_id = self.request.id
         db.commit()
 
-        logger.info(f"[Niche {niche_id}] Starting trend collection task (celery_id={self.request.id})")
+        logger.info(
+            f"[Niche {niche_id}] Starting trend collection task "
+            f"(collection_type={collection_type}, celery_id={self.request.id})"
+        )
 
         service = TrendCollectionService(db)
-        result = service.collect_trends(niche_id)
+        result = service.collect_trends(niche_id, collection_type=collection_type)
 
         # Update task record with results
         task_record.status = "completed"
@@ -46,18 +50,24 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None)
         task_record.completed_at = datetime.now(timezone.utc)
         db.commit()
 
-        # Update schedule last_run_at
-        schedules = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == niche_id).all()
-        if schedules:
-            for schedule in schedules:
-                schedule.last_run_at = datetime.now(timezone.utc)
+        # Update schedule last_run_at only for the matching collection_type
+        schedule = (
+            db.query(ScheduleConfig)
+            .filter(
+                ScheduleConfig.niche_id == niche_id,
+                ScheduleConfig.collection_type == collection_type,
+            )
+            .first()
+        )
+        if schedule:
+            schedule.last_run_at = datetime.now(timezone.utc)
             db.commit()
 
-        logger.info(f"Collection completed for niche {niche_id}: {result}")
-        return {"niche_id": niche_id, "status": "completed", **result}
+        logger.info(f"Collection completed for niche {niche_id} ({collection_type}): {result}")
+        return {"niche_id": niche_id, "collection_type": collection_type, "status": "completed", **result}
 
     except Exception as exc:
-        logger.error(f"Collection failed for niche {niche_id}: {exc}")
+        logger.error(f"Collection failed for niche {niche_id} ({collection_type}): {exc}")
 
         # Update task record with failure
         try:
@@ -107,15 +117,19 @@ def run_scheduled_collections():
                 # Create task record first
                 task_record = CollectionTask(
                     niche_id=config.niche_id,
+                    collection_type=config.collection_type,
                     status="queued",
                 )
                 db.add(task_record)
                 db.commit()
                 db.refresh(task_record)
 
-                collect_niche_trends.delay(config.niche_id, task_record.id)
+                collect_niche_trends.delay(config.niche_id, task_record.id, config.collection_type)
                 dispatched += 1
-                logger.info(f"Dispatched collection for niche {config.niche_id}")
+                logger.info(
+                    f"Dispatched collection for niche {config.niche_id} "
+                    f"(collection_type={config.collection_type})"
+                )
 
         logger.info(f"Scheduled check complete: {dispatched} collections dispatched")
         return {"dispatched": dispatched}

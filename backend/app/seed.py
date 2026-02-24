@@ -7,6 +7,30 @@ from app.models import Niche, ScheduleConfig
 
 NICHES_CONFIG = Path(__file__).resolve().parent / "niches.json"
 
+COLLECTION_DEFAULTS = {
+    "now": 30,
+    "daily": 1440,
+    "weekly": 1440,
+}
+
+
+def _ensure_schedule_configs(db: Session, niche_id: int):
+    existing = (
+        db.query(ScheduleConfig.collection_type)
+        .filter(ScheduleConfig.niche_id == niche_id)
+        .all()
+    )
+    existing_types = {row[0] for row in existing}
+
+    for ctype, interval in COLLECTION_DEFAULTS.items():
+        if ctype not in existing_types:
+            db.add(ScheduleConfig(
+                niche_id=niche_id,
+                collection_type=ctype,
+                interval_minutes=interval,
+                is_enabled=False,
+            ))
+
 
 def seed_data(db: Session):
     if not NICHES_CONFIG.exists():
@@ -24,6 +48,8 @@ def seed_data(db: Session):
             new_desc = entry.get("description", "")
             if existing.description != new_desc:
                 existing.description = new_desc
+            # Ensure all 3 schedule configs exist
+            _ensure_schedule_configs(db, existing.id)
             continue
 
         niche = Niche(
@@ -36,11 +62,6 @@ def seed_data(db: Session):
         db.add(niche)
         db.flush()
 
-        schedule = ScheduleConfig(
-            niche_id=niche.id,
-            interval_minutes=60,
-            is_enabled=False,
-        )
-        db.add(schedule)
+        _ensure_schedule_configs(db, niche.id)
 
     db.commit()

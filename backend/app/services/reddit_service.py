@@ -45,19 +45,13 @@ class RedditService:
         response.raise_for_status()
         return response
 
-    def fetch_subreddit_posts(self, subreddit: str) -> list[dict]:
-        endpoints = [
-            (f"https://www.reddit.com/r/{subreddit}/hot.json?limit=20", "hot"),
-            (f"https://www.reddit.com/r/{subreddit}/rising.json?limit=20", "rising"),
-            (f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=20", "top"),
-        ]
-
+    def _fetch_endpoints(self, subreddit: str, endpoints: list[str]) -> list[dict]:
         seen_ids = set()
         posts = []
 
-        for url, trend_type in endpoints:
+        for url in endpoints:
             try:
-                logger.info(f"Scraping r/{subreddit} [{trend_type}] ...")
+                logger.info(f"Scraping r/{subreddit} ...")
                 time.sleep(2)
                 response = self._fetch_with_retry(url)
                 data = response.json()
@@ -84,7 +78,6 @@ class RedditService:
                         "subreddit": post.get("subreddit", subreddit),
                         "permalink": post.get("permalink", ""),
                         "created_utc": post.get("created_utc", 0),
-                        "trend_type": trend_type,
                     })
             except Exception as e:
                 logger.warning(f"Failed to fetch {url}: {e}")
@@ -93,15 +86,46 @@ class RedditService:
         logger.info(f"Scraped r/{subreddit}: {len(posts)} unique posts collected")
         return posts
 
-    def fetch_all_subreddits(self, subreddits: list[str]) -> list[dict]:
+    def fetch_subreddit_now(self, subreddit: str) -> list[dict]:
+        endpoints = [
+            f"https://www.reddit.com/r/{subreddit}/hot.json?limit=20",
+        ]
+        return self._fetch_endpoints(subreddit, endpoints)
+
+    def fetch_subreddit_daily(self, subreddit: str) -> list[dict]:
+        endpoints = [
+            f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=25",
+        ]
+        return self._fetch_endpoints(subreddit, endpoints)
+
+    def fetch_subreddit_weekly(self, subreddit: str) -> list[dict]:
+        endpoints = [
+            f"https://www.reddit.com/r/{subreddit}/top.json?t=week&limit=25",
+        ]
+        return self._fetch_endpoints(subreddit, endpoints)
+
+    def fetch_subreddit_posts(self, subreddit: str) -> list[dict]:
+        """Legacy method — same as fetch_subreddit_now."""
+        return self.fetch_subreddit_now(subreddit)
+
+    def fetch_all_subreddits(self, subreddits: list[str], collection_type: str = "now") -> list[dict]:
         all_posts = []
         fetched_subreddits = []
 
-        logger.info(f"Starting Reddit scraping for {len(subreddits)} subreddits: {', '.join(subreddits)}")
+        logger.info(
+            f"Starting Reddit scraping ({collection_type}) for "
+            f"{len(subreddits)} subreddits: {', '.join(subreddits)}"
+        )
+
+        fetch_method = {
+            "now": self.fetch_subreddit_now,
+            "daily": self.fetch_subreddit_daily,
+            "weekly": self.fetch_subreddit_weekly,
+        }.get(collection_type, self.fetch_subreddit_now)
 
         for subreddit in subreddits:
             try:
-                posts = self.fetch_subreddit_posts(subreddit)
+                posts = fetch_method(subreddit)
                 if posts:
                     all_posts.extend(posts)
                     fetched_subreddits.append(subreddit)

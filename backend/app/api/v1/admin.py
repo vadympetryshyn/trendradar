@@ -29,6 +29,7 @@ def _task_to_response(task: CollectionTask) -> CollectionTaskResponse:
         niche_id=task.niche_id,
         niche_name=niche.name if niche else f"Niche #{task.niche_id}",
         niche_slug=niche.slug if niche else "",
+        collection_type=task.collection_type,
         celery_task_id=task.celery_task_id,
         status=task.status,
         trends_created=task.trends_created,
@@ -47,6 +48,7 @@ def _build_niche_schedule_status(
         niche_id=config.niche_id,
         niche_name=niche.name if niche else f"Niche #{config.niche_id}",
         niche_slug=niche.slug if niche else "",
+        collection_type=config.collection_type,
         is_enabled=config.is_enabled,
         interval_minutes=config.interval_minutes,
         last_run_at=config.last_run_at,
@@ -139,19 +141,25 @@ def manual_run(
 ):
     from app.tasks import collect_niche_trends
 
+    collection_types = (
+        [request.collection_type] if request.collection_type else ["now", "daily", "weekly"]
+    )
+
     if request.niche_id is not None:
         niche = db.query(Niche).filter(Niche.id == request.niche_id).first()
         if not niche:
             raise HTTPException(status_code=404, detail="Niche not found")
 
-        task_record = CollectionTask(niche_id=niche.id, status="queued")
-        db.add(task_record)
-        db.commit()
-        db.refresh(task_record)
+        for ct in collection_types:
+            task_record = CollectionTask(niche_id=niche.id, collection_type=ct, status="queued")
+            db.add(task_record)
+            db.commit()
+            db.refresh(task_record)
+            collect_niche_trends.delay(niche.id, task_record.id, ct)
 
-        collect_niche_trends.delay(niche.id, task_record.id)
+        types_str = ", ".join(collection_types)
         return ManualTriggerResponse(
-            message=f"Collection triggered for '{niche.name}'",
+            message=f"Collection triggered for '{niche.name}' ({types_str})",
             niche_id=niche.id,
             niche_name=niche.name,
         )
@@ -161,22 +169,32 @@ def manual_run(
         raise HTTPException(status_code=404, detail="No active niches found")
 
     for niche in niches:
-        task_record = CollectionTask(niche_id=niche.id, status="queued")
-        db.add(task_record)
-        db.commit()
-        db.refresh(task_record)
-        collect_niche_trends.delay(niche.id, task_record.id)
+        for ct in collection_types:
+            task_record = CollectionTask(niche_id=niche.id, collection_type=ct, status="queued")
+            db.add(task_record)
+            db.commit()
+            db.refresh(task_record)
+            collect_niche_trends.delay(niche.id, task_record.id, ct)
 
+    types_str = ", ".join(collection_types)
     return ManualTriggerResponse(
-        message=f"Collection triggered for {len(niches)} niches",
+        message=f"Collection triggered for {len(niches)} niches ({types_str})",
     )
 
 
 @router.post("/scheduler/niche/{niche_id}/start", response_model=NicheScheduleStatus)
-def start_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
-    config = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == niche_id).first()
+def start_niche_schedule(
+    niche_id: int,
+    collection_type: str = Query("now"),
+    db: Session = Depends(get_db),
+):
+    config = (
+        db.query(ScheduleConfig)
+        .filter(ScheduleConfig.niche_id == niche_id, ScheduleConfig.collection_type == collection_type)
+        .first()
+    )
     if not config:
-        raise HTTPException(status_code=404, detail="Schedule not found for this niche")
+        raise HTTPException(status_code=404, detail="Schedule not found for this niche/collection_type")
 
     config.is_enabled = True
     config.updated_at = datetime.now(timezone.utc)
@@ -185,7 +203,7 @@ def start_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
 
     trend_count = (
         db.query(func.count(Trend.id))
-        .filter(Trend.niche_id == niche_id, Trend.status == "active")
+        .filter(Trend.niche_id == niche_id, Trend.status == "active", Trend.collection_type == collection_type)
         .scalar()
     )
 
@@ -193,10 +211,18 @@ def start_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/scheduler/niche/{niche_id}/stop", response_model=NicheScheduleStatus)
-def stop_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
-    config = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == niche_id).first()
+def stop_niche_schedule(
+    niche_id: int,
+    collection_type: str = Query("now"),
+    db: Session = Depends(get_db),
+):
+    config = (
+        db.query(ScheduleConfig)
+        .filter(ScheduleConfig.niche_id == niche_id, ScheduleConfig.collection_type == collection_type)
+        .first()
+    )
     if not config:
-        raise HTTPException(status_code=404, detail="Schedule not found for this niche")
+        raise HTTPException(status_code=404, detail="Schedule not found for this niche/collection_type")
 
     config.is_enabled = False
     config.updated_at = datetime.now(timezone.utc)
@@ -205,7 +231,7 @@ def stop_niche_schedule(niche_id: int, db: Session = Depends(get_db)):
 
     trend_count = (
         db.query(func.count(Trend.id))
-        .filter(Trend.niche_id == niche_id, Trend.status == "active")
+        .filter(Trend.niche_id == niche_id, Trend.status == "active", Trend.collection_type == collection_type)
         .scalar()
     )
 
