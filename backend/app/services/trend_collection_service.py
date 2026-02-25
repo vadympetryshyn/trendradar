@@ -29,7 +29,11 @@ class TrendCollectionService:
     def _compute_metrics(self, trends_data: list[dict], all_posts: list[dict]) -> list[dict]:
         post_map = {p["id"]: p for p in all_posts}
 
-        # First pass: compute raw engagement for each trend
+        # Load subreddit baselines for normalization
+        stats_rows = self.db.query(SubredditStats).all()
+        stats_map = {s.subreddit: s for s in stats_rows}
+
+        # First pass: compute normalized engagement for each trend
         trend_engagements = []
         trend_details = []
 
@@ -40,9 +44,19 @@ class TrendCollectionService:
 
             mention_count = len(valid_ids)
 
-            total_score = sum(p.get("score", 0) for p in valid_posts)
-            total_comments = sum(p.get("num_comments", 0) for p in valid_posts)
-            engagement = total_score + total_comments
+            # Per-post normalized engagement
+            normalized_posts = []
+            for p in valid_posts:
+                sub = p.get("subreddit", "")
+                stats = stats_map.get(sub)
+                score = p.get("score", 0)
+                comments = p.get("num_comments", 0)
+                norm_score = score / stats.avg_score if stats and stats.avg_score > 0 else score
+                norm_comments = comments / stats.avg_comments if stats and stats.avg_comments > 0 else comments
+                normalized_posts.append(norm_score + norm_comments)
+
+            # Average (not sum) so fewer but more anomalous posts rank higher
+            engagement = sum(normalized_posts) / len(normalized_posts) if normalized_posts else 0.0
 
             trend_engagements.append(engagement)
             trend_details.append({

@@ -19,7 +19,7 @@ interface TrendCardProps {
 
 export function TrendCard({ trend }: TrendCardProps) {
   return (
-    <Link href={`/admin/trends/${trend.id}`}>
+    <Link href={`/trends/${trend.id}`}>
       <Card className="h-full hover:bg-muted/30 transition-colors cursor-pointer">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">

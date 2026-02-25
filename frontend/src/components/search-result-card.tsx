@@ -20,7 +20,7 @@ export function SearchResultCard({ result }: SearchResultCardProps) {
   const similarityPct = Math.round(result.similarity * 100);
 
   return (
-    <Link href={`/admin/trends/${result.id}`}>
+    <Link href={`/trends/${result.id}`}>
       <Card className="h-full hover:bg-muted/30 transition-colors cursor-pointer">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
