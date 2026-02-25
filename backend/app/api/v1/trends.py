@@ -16,7 +16,7 @@ from app.schemas import (
 from app.services.embedding_service import EmbeddingService, get_embedding_service
 from app.services.trend_collection_service import TrendCollectionService
 
-router = APIRouter(prefix="/trends", tags=["trends"])
+router = APIRouter(prefix="/internal/trends", tags=["internal-trends"])
 
 
 def _build_search_result(trend: Trend, distance: float) -> TrendSearchResult:

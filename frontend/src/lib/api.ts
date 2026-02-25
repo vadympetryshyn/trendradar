@@ -31,7 +31,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 // ── Niches ──────────────────────────────────────────────────────────
 
 export function getNiches(): Promise<Niche[]> {
-  return fetchApi("/api/v1/niches");
+  return fetchApi("/api/v1/internal/niches");
 }
 
 // ── Trends ──────────────────────────────────────────────────────────
@@ -54,12 +54,12 @@ export function getTrends(params?: {
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));
   const qs = searchParams.toString();
-  return fetchApi(`/api/v1/trends${qs ? `?${qs}` : ""}`);
+  return fetchApi(`/api/v1/internal/trends${qs ? `?${qs}` : ""}`);
 }
 
 export function getTrend(id: string, webSearch = false): Promise<TrendDetail> {
   const qs = webSearch ? "?web_search=true" : "";
-  return fetchApi(`/api/v1/trends/${id}${qs}`);
+  return fetchApi(`/api/v1/internal/trends/${id}${qs}`);
 }
 
 export function searchTrends(
@@ -67,7 +67,7 @@ export function searchTrends(
   nicheId?: number,
   limit?: number
 ): Promise<TrendSearchResponse> {
-  return fetchApi("/api/v1/trends/search", {
+  return fetchApi("/api/v1/internal/trends/search", {
     method: "POST",
     body: JSON.stringify({
       query,
@@ -85,7 +85,7 @@ export function getRecommended(
     description,
     limit: String(limit || 5),
   });
-  return fetchApi(`/api/v1/trends/recommended?${params}`);
+  return fetchApi(`/api/v1/internal/trends/recommended?${params}`);
 }
 
 // ── Scheduler ───────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ export function deleteCollectionTasksBulk(
 export function deleteTrendsBulk(
   ids: string[]
 ): Promise<{ detail: string }> {
-  return fetchApi("/api/v1/trends/bulk", {
+  return fetchApi("/api/v1/internal/trends/bulk", {
     method: "DELETE",
     body: JSON.stringify({ ids }),
   });

@@ -19,6 +19,14 @@ from app.schemas.task import (
     CollectionTaskResponse,
     CollectionTaskListResponse,
 )
+from app.schemas.external import (
+    ExternalTrendListItem,
+    ExternalTrendDetail,
+    ExternalTrendListResponse,
+    ExternalTrendSearchResult,
+    ExternalTrendSearchResponse,
+    ExternalNicheResponse,
+)
 
 __all__ = [
     "NicheResponse",
@@ -37,4 +45,10 @@ __all__ = [
     "DashboardStatsResponse",
     "CollectionTaskResponse",
     "CollectionTaskListResponse",
+    "ExternalTrendListItem",
+    "ExternalTrendDetail",
+    "ExternalTrendListResponse",
+    "ExternalTrendSearchResult",
+    "ExternalTrendSearchResponse",
+    "ExternalNicheResponse",
 ]

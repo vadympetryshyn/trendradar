@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models import Niche, Trend
 from app.schemas import NicheDetailResponse, NicheResponse
 
-router = APIRouter(prefix="/niches", tags=["niches"])
+router = APIRouter(prefix="/internal/niches", tags=["internal-niches"])
 
 
 @router.get("", response_model=list[NicheResponse])
