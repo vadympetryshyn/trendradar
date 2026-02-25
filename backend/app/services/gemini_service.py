@@ -49,8 +49,11 @@ class GeminiService:
     def _build_now_prompt(self, posts: list[dict], niche_context: str) -> str:
         prompt = f"""{niche_context}You are an expert trend analyst. Analyze the following hot Reddit posts and identify the most significant current trends.
 
+CRITICAL RULES:
+- Each trend MUST focus on ONE specific topic, event, product, or development. Don't combine multiple unrelated news items into a single trend.
+
 For each trend, provide:
-- title: A concise title for the trend
+- title: A concise, specific title for the trend (name the specific product/event/topic)
 - summary: A 2-5 sentence description of what this trend is about
 - sentiment: One of "positive", "negative", "neutral", or "mixed"
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
@@ -58,7 +61,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
 
-Identify between 5 and 20 trends, ordered by significance (highest first).
+Identify between 5 and 30 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -84,8 +87,14 @@ Here are the Reddit posts to analyze:
     def _build_daily_prompt(self, posts: list[dict], niche_context: str) -> str:
         prompt = f"""{niche_context}You are an expert trend analyst. Analyze the top Reddit posts from the past day and identify the most significant trends.
 
+CRITICAL RULES:
+- Each trend MUST focus on ONE specific topic, event, product, or development. NEVER combine multiple unrelated news items into a single trend.
+- For example, if there are posts about "Qwen 3.5 release" and "Liquid AI new model", these MUST be separate trends — do NOT merge them into "New Model Releases" or similar umbrella trends.
+- Only group posts together if they are genuinely about the SAME specific thing (e.g. multiple posts discussing Qwen 3.5 specifically).
+- Prefer more specific trends over fewer generic ones.
+
 For each trend, provide:
-- title: A concise title for the trend
+- title: A concise, specific title for the trend (name the specific product/event/topic)
 - summary: A 2-5 sentence description of what this trend is about
 - sentiment: One of "positive", "negative", "neutral", or "mixed"
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
@@ -93,7 +102,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
 
-Identify between 5 and 20 trends, ordered by significance (highest first).
+Identify between 5 and 30 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -119,8 +128,14 @@ Here are the top Reddit posts from the past day:
     def _build_weekly_prompt(self, posts: list[dict], niche_context: str) -> str:
         prompt = f"""{niche_context}You are an expert trend analyst. Analyze the top Reddit posts from the past week and identify the most significant trends.
 
+CRITICAL RULES:
+- Each trend MUST focus on ONE specific topic, event, product, or development. NEVER combine multiple unrelated news items into a single trend.
+- For example, if there are posts about "Qwen 3.5 release" and "Liquid AI new model", these MUST be separate trends — do NOT merge them into "New Model Releases" or similar umbrella trends.
+- Only group posts together if they are genuinely about the SAME specific thing (e.g. multiple posts discussing Qwen 3.5 specifically).
+- Prefer more specific trends over fewer generic ones.
+
 For each trend, provide:
-- title: A concise title for the trend
+- title: A concise, specific title for the trend (name the specific product/event/topic)
 - summary: A 2-5 sentence description of what this trend is about
 - sentiment: One of "positive", "negative", "neutral", or "mixed"
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
@@ -128,7 +143,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
 
-Identify between 5 and 25 trends, ordered by significance (highest first).
+Identify between 5 and 35 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
