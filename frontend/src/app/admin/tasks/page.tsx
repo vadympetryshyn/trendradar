@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleStop, Trash2 } from "lucide-react";
+import { CircleStop, Eye, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -23,6 +23,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   getCollectionTasks,
   getSchedulerStatus,
@@ -54,6 +61,7 @@ export default function TasksPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -379,8 +387,23 @@ export default function TasksPage() {
                       <td className="py-3 pr-4 text-right tabular-nums">
                         {task.trends_expired}
                       </td>
-                      <td className="py-3 pr-4 max-w-[200px] truncate text-red-500">
-                        {task.error_message || "\u2014"}
+                      <td className="py-3 pr-4 max-w-[200px]">
+                        {task.error_message ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-red-500">{task.error_message}</span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                              title="View full error"
+                              onClick={() => setErrorDetail(task.error_message)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          "\u2014"
+                        )}
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
                         {new Date(task.started_at).toLocaleString()}
@@ -482,6 +505,19 @@ export default function TasksPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Error detail modal */}
+      <Dialog open={errorDetail !== null} onOpenChange={() => setErrorDetail(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Error Details</DialogTitle>
+            <DialogDescription>Full error message from the failed task</DialogDescription>
+          </DialogHeader>
+          <pre className="overflow-auto rounded-lg bg-muted p-4 text-sm whitespace-pre-wrap break-words">
+            {errorDetail}
+          </pre>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

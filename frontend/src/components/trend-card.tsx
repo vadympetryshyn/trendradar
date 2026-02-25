@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { SENTIMENT_COLORS } from "@/lib/constants";
+import { COLLECTION_TYPE_STYLES, SENTIMENT_COLORS } from "@/lib/constants";
 import { stripSubredditPrefix } from "@/lib/format";
 import type { Trend } from "@/lib/types";
 
@@ -39,6 +39,14 @@ export function TrendCard({ trend }: TrendCardProps) {
             {trend.mention_count > 0 && (
               <Badge variant="outline">
                 {trend.mention_count} mention{trend.mention_count !== 1 ? "s" : ""}
+              </Badge>
+            )}
+            {COLLECTION_TYPE_STYLES[trend.collection_type] && (
+              <Badge
+                variant="outline"
+                className={COLLECTION_TYPE_STYLES[trend.collection_type].className}
+              >
+                {COLLECTION_TYPE_STYLES[trend.collection_type].label}
               </Badge>
             )}
             {trend.research_done && (

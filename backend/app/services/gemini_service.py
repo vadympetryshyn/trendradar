@@ -41,6 +41,8 @@ class GeminiService:
             prompt = self._build_daily_prompt(posts, niche_context)
         elif collection_type == "weekly":
             prompt = self._build_weekly_prompt(posts, niche_context)
+        elif collection_type == "rising":
+            prompt = self._build_rising_prompt(posts, niche_context)
         else:
             prompt = self._build_now_prompt(posts, niche_context)
 
@@ -61,7 +63,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
 
-Identify between 5 and 30 trends, ordered by significance (highest first).
+Identify between 5 and 20 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -143,7 +145,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
 
-Identify between 5 and 35 trends, ordered by significance (highest first).
+Identify between 20 and 50 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -165,6 +167,67 @@ Here are the top Reddit posts from the past week:
 """
         prompt += self._format_posts(posts)
         return prompt
+
+    def _build_rising_prompt(self, posts: list[dict], niche_context: str) -> str:
+        prompt = f"""{niche_context}You are an expert trend analyst specializing in early trend detection. Analyze the following very new Reddit posts (< 3 hours old) that are gaining traction unusually fast compared to their subreddit baseline.
+
+Each post includes a "velocity" (engagement per hour) and "velocity_ratio" (how many times faster than the subreddit average). Higher velocity_ratio = more unusual engagement.
+
+CRITICAL RULES:
+- Each trend MUST focus on ONE specific topic, event, product, or development.
+- Only identify trends that show genuine rising momentum — not just any new post.
+- It is OK to return an empty trends array if nothing is genuinely rising.
+
+For each trend, provide:
+- title: A concise, specific title for the trend
+- summary: A 2-5 sentence description of what this trend is about and why it's gaining early traction
+- sentiment: One of "positive", "negative", "neutral", or "mixed"
+- category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
+- key_points: An array of 2-5 key points about this trend
+- source_subreddits: An array of subreddit names where this trend appeared
+- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
+
+Identify between 1 and 10 potential rising trends, ordered by significance (highest first). Return an empty trends array if nothing qualifies.
+
+Return JSON in this exact format:
+{{
+  "trends": [
+    {{
+      "title": "string",
+      "summary": "string",
+      "sentiment": "string",
+      "category": "string",
+      "key_points": ["string"],
+      "source_subreddits": ["string"],
+      "source_post_ids": ["string"]
+    }}
+  ]
+}}
+
+Here are the rising Reddit posts to analyze:
+
+"""
+        prompt += self._format_posts_with_velocity(posts)
+        return prompt
+
+    def _format_posts_with_velocity(self, posts: list[dict]) -> str:
+        text = ""
+        now = time.time()
+        for p in posts:
+            age_hours = (now - p.get("created_utc", now)) / 3600
+            velocity = p.get("velocity", 0.0)
+            velocity_ratio = p.get("velocity_ratio", 0.0)
+            posts_text = (
+                f"[id:{p['id']}] [r/{p['subreddit']}] "
+                f"(score: {p['score']}, comments: {p['num_comments']}, age: {age_hours:.1f}h, "
+                f"velocity: {velocity:.1f}, velocity_ratio: {velocity_ratio:.1f}x)\n"
+                f"Title: {p['title']}\n"
+            )
+            if p.get("selftext"):
+                posts_text += f"Text: {p['selftext'][:500]}\n"
+            posts_text += "\n"
+            text += posts_text
+        return text
 
     def _format_posts(self, posts: list[dict]) -> str:
         text = ""

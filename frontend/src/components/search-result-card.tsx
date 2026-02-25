@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { SENTIMENT_COLORS } from "@/lib/constants";
+import { COLLECTION_TYPE_STYLES, SENTIMENT_COLORS } from "@/lib/constants";
 import type { TrendSearchResult } from "@/lib/types";
 
 interface SearchResultCardProps {
@@ -41,6 +41,14 @@ export function SearchResultCard({ result }: SearchResultCardProps) {
               {result.sentiment}
             </Badge>
             <Badge variant="secondary">{result.category}</Badge>
+            {COLLECTION_TYPE_STYLES[result.collection_type] && (
+              <Badge
+                variant="outline"
+                className={COLLECTION_TYPE_STYLES[result.collection_type].className}
+              >
+                {COLLECTION_TYPE_STYLES[result.collection_type].label}
+              </Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent>

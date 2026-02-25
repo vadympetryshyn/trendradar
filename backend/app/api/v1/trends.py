@@ -149,7 +149,7 @@ def search_trends(
     query = db.query(
         Trend,
         Trend.embedding.cosine_distance(query_embedding).label("distance"),
-    ).filter(Trend.embedding.isnot(None))
+    ).filter(Trend.embedding.isnot(None), Trend.status == "active")
 
     if request.niche_id is not None:
         query = query.filter(Trend.niche_id == request.niche_id)

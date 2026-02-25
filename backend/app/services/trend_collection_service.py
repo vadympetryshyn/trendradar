@@ -1,9 +1,10 @@
 import logging
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models import Niche, Trend
+from app.models import Niche, Trend, SubredditStats
 from app.services.embedding_service import get_embedding_service
 from app.services.gemini_service import GeminiService
 from app.services.perplexity_service import PerplexityService
@@ -131,6 +132,192 @@ class TrendCollectionService:
         logger.info(f"Embeddings generated: {embedded_count}/{len(new_trends)} trends have embeddings")
         return new_trends
 
+    def _compute_baselines(self, hot_posts: list[dict]) -> dict[str, dict]:
+        by_sub: dict[str, list[dict]] = {}
+        now = time.time()
+        for p in hot_posts:
+            sub = p.get("subreddit", "")
+            if sub:
+                by_sub.setdefault(sub, []).append(p)
+
+        baselines = {}
+        for sub, posts in by_sub.items():
+            scores = []
+            comments = []
+            ages = []
+            velocities = []
+            for p in posts:
+                score = p.get("score", 0)
+                num_comments = p.get("num_comments", 0)
+                age_hours = max((now - p.get("created_utc", now)) / 3600, 0.01)
+                velocity = (score + num_comments) / age_hours
+                scores.append(score)
+                comments.append(num_comments)
+                ages.append(age_hours)
+                velocities.append(velocity)
+
+            n = len(posts)
+            baselines[sub] = {
+                "avg_score": sum(scores) / n,
+                "avg_comments": sum(comments) / n,
+                "avg_age_hours": sum(ages) / n,
+                "avg_velocity": sum(velocities) / n,
+                "post_count": n,
+            }
+        return baselines
+
+    def _upsert_baselines(self, baselines: dict[str, dict]) -> None:
+        for sub, stats in baselines.items():
+            existing = (
+                self.db.query(SubredditStats)
+                .filter(SubredditStats.subreddit == sub)
+                .first()
+            )
+            if existing:
+                existing.avg_score = stats["avg_score"]
+                existing.avg_comments = stats["avg_comments"]
+                existing.avg_age_hours = stats["avg_age_hours"]
+                existing.avg_velocity = stats["avg_velocity"]
+                existing.post_count = stats["post_count"]
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                self.db.add(SubredditStats(
+                    subreddit=sub,
+                    avg_score=stats["avg_score"],
+                    avg_comments=stats["avg_comments"],
+                    avg_age_hours=stats["avg_age_hours"],
+                    avg_velocity=stats["avg_velocity"],
+                    post_count=stats["post_count"],
+                    updated_at=datetime.now(timezone.utc),
+                ))
+        self.db.flush()
+
+    def _filter_new_posts(self, new_posts: list[dict], baselines: dict[str, dict]) -> list[dict]:
+        now = time.time()
+        filtered = []
+        skip_age_young = 0
+        skip_age_old = 0
+        skip_low_score = 0
+        skip_no_baseline = 0
+        skip_low_velocity = 0
+
+        for p in new_posts:
+            age_hours = (now - p.get("created_utc", now)) / 3600
+            # Skip posts younger than 5 min or older than 3 hours
+            if age_hours < 5 / 60:
+                skip_age_young += 1
+                continue
+            if age_hours > 3:
+                skip_age_old += 1
+                continue
+            score = p.get("score", 0)
+            if score < 2:
+                skip_low_score += 1
+                continue
+
+            num_comments = p.get("num_comments", 0)
+            velocity = (score + num_comments) / max(age_hours, 0.01)
+
+            sub = p.get("subreddit", "")
+            baseline = baselines.get(sub)
+            if not baseline or baseline["avg_velocity"] <= 0:
+                skip_no_baseline += 1
+                continue
+
+            velocity_ratio = velocity / baseline["avg_velocity"]
+            if velocity_ratio < 0.3:
+                skip_low_velocity += 1
+                continue
+
+            p["velocity"] = velocity
+            p["velocity_ratio"] = velocity_ratio
+            filtered.append(p)
+
+        logger.info(
+            f"Rising filter breakdown: {len(new_posts)} total -> "
+            f"skip_age_young={skip_age_young}, skip_age_old={skip_age_old}, "
+            f"skip_low_score={skip_low_score}, skip_no_baseline={skip_no_baseline}, "
+            f"skip_low_velocity={skip_low_velocity}, passed={len(filtered)}"
+        )
+        if filtered:
+            for p in filtered[:5]:
+                logger.info(
+                    f"  Passed: r/{p.get('subreddit')} [{p['id']}] "
+                    f"score={p.get('score')}, comments={p.get('num_comments')}, "
+                    f"velocity={p['velocity']:.1f}, ratio={p['velocity_ratio']:.2f}x — {p.get('title', '')[:80]}"
+                )
+
+        filtered.sort(key=lambda x: x.get("velocity_ratio", 0), reverse=True)
+        return filtered
+
+    def _run_rising_detection(
+        self,
+        niche: Niche,
+        reddit: RedditService,
+        gemini: GeminiService,
+        hot_posts: list[dict],
+    ) -> tuple[int, int]:
+        logger.info(f"Rising detection: computing baselines from {len(hot_posts)} hot posts ...")
+        baselines = self._compute_baselines(hot_posts)
+        if not baselines:
+            logger.info("Rising detection: no baselines computed, skipping")
+            expired = self._expire_trends(niche.id, "rising")
+            return 0, expired
+
+        self._upsert_baselines(baselines)
+        logger.info(f"Rising detection: baselines upserted for {len(baselines)} subreddits")
+        for sub, stats in baselines.items():
+            logger.info(
+                f"  Baseline r/{sub}: avg_score={stats['avg_score']:.1f}, "
+                f"avg_comments={stats['avg_comments']:.1f}, "
+                f"avg_velocity={stats['avg_velocity']:.1f}, "
+                f"post_count={stats['post_count']}"
+            )
+
+        # Fetch /new posts per subreddit
+        all_new_posts: list[dict] = []
+        for sub in niche.subreddits:
+            if sub not in baselines:
+                logger.info(f"Rising detection: skipping r/{sub} (no baseline)")
+                continue
+            try:
+                new_posts = reddit.fetch_subreddit_new(sub)
+                all_new_posts.extend(new_posts)
+                logger.info(f"Rising detection: fetched {len(new_posts)} /new posts from r/{sub}")
+            except Exception as e:
+                logger.warning(f"Rising detection: failed to fetch /new for r/{sub}: {e}")
+
+        # Filter posts against baselines
+        filtered = self._filter_new_posts(all_new_posts, baselines)
+        logger.info(f"Rising detection: {len(filtered)} posts passed filter (from {len(all_new_posts)} total)")
+
+        # Expire old rising trends regardless
+        expired_count = self._expire_trends(niche.id, "rising")
+        logger.info(f"Rising detection: expired {expired_count} previous rising trends")
+
+        if not filtered:
+            logger.info("Rising detection: no posts passed filter, skipping Gemini call")
+            return 0, expired_count
+
+        # Gemini analysis
+        logger.info(f"Rising detection: analyzing {len(filtered)} posts with Gemini ...")
+        result = gemini.analyze_posts(
+            filtered,
+            niche_name=niche.name,
+            niche_description=niche.description or "",
+            collection_type="rising",
+        )
+        trends_data = result.get("trends", [])
+
+        if not trends_data:
+            logger.info("Rising detection: Gemini returned no rising trends")
+            return 0, expired_count
+
+        # Save rising trends
+        new_trends = self._save_trends(trends_data, filtered, niche.id, "rising")
+        logger.info(f"Rising detection: {len(new_trends)} rising trends saved")
+        return len(new_trends), expired_count
+
     def _expire_trends(self, niche_id: int, collection_type: str) -> int:
         expired_count = (
             self.db.query(Trend)
@@ -150,6 +337,9 @@ class TrendCollectionService:
         return expired_count
 
     def collect_trends(self, niche_id: int, collection_type: str = "now") -> dict:
+        if collection_type == "rising":
+            raise ValueError("'rising' cannot be triggered manually — it runs automatically within 'now' collections")
+
         niche = self.db.query(Niche).filter(Niche.id == niche_id).first()
         if not niche:
             raise ValueError(f"Niche with id {niche_id} not found")
@@ -189,6 +379,18 @@ class TrendCollectionService:
             logger.info("Step 4: Saving trends and generating embeddings ...")
             new_trends = self._save_trends(trends_data, all_posts, niche.id, collection_type)
 
+            # Run rising detection embedded in "now" collections
+            rising_created = 0
+            rising_expired = 0
+            if collection_type == "now":
+                try:
+                    logger.info("Step 4b: Running rising trend detection ...")
+                    rising_created, rising_expired = self._run_rising_detection(
+                        niche, reddit, gemini, all_posts
+                    )
+                except Exception as e:
+                    logger.warning(f"Rising detection failed (non-fatal): {e}")
+
             logger.info("Step 5: Committing to database ...")
             self.db.commit()
 
@@ -196,7 +398,14 @@ class TrendCollectionService:
                 f"=== Collection complete for niche '{niche.name}' ({collection_type}): "
                 f"{len(new_trends)} created, {expired_count} expired ==="
             )
-            return {"created": len(new_trends), "expired": expired_count}
+            if rising_created or rising_expired:
+                logger.info(
+                    f"    Rising: {rising_created} created, {rising_expired} expired"
+                )
+            return {
+                "created": len(new_trends) + rising_created,
+                "expired": expired_count + rising_expired,
+            }
 
         finally:
             reddit.close()
@@ -210,7 +419,7 @@ class TrendCollectionService:
         if web_search and not trend.research_done:
             logger.info(f"Researching trend '{trend.title}' via Perplexity ...")
             perplexity = PerplexityService()
-            context, citations = perplexity.research_trend(trend.title, trend.summary)
+            context, citations = perplexity.research_trend(trend.title, trend.summary, trend.key_points)
             if context:
                 logger.info(f"Perplexity returned {len(citations)} citations, updating trend ...")
                 trend.context_summary = context

@@ -10,6 +10,7 @@ import type { Niche, Trend, TrendSearchResult } from "@/lib/types";
 
 const COLLECTION_TABS = [
   { value: "now" as const, label: "Trending Now" },
+  { value: "rising" as const, label: "Rising" },
   { value: "daily" as const, label: "Today's Trends" },
   { value: "weekly" as const, label: "This Week" },
 ];
@@ -22,7 +23,10 @@ export default function Home() {
   const [selectedNicheId, setSelectedNicheId] = useState<number | undefined>();
 
   // Collection type filter
-  const [collectionType, setCollectionType] = useState<"now" | "daily" | "weekly">("now");
+  const [collectionType, setCollectionType] = useState<"now" | "daily" | "weekly" | "rising">("now");
+
+  // Tab counts
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,6 +47,19 @@ export default function Home() {
       .catch((err) => setError(err.message));
   }, []);
 
+  // Fetch counts for all tabs when niche changes
+  useEffect(() => {
+    if (!selectedNicheId) return;
+    Promise.all(
+      COLLECTION_TABS.map((tab) =>
+        getTrends({ niche_id: selectedNicheId, collection_type: tab.value, limit: 1 })
+          .then((data) => [tab.value, data.total] as const)
+      )
+    )
+      .then((entries) => setTabCounts(Object.fromEntries(entries)))
+      .catch(() => {});
+  }, [selectedNicheId]);
+
   useEffect(() => {
     if (isSearching) return;
     if (!selectedNicheId) return;
@@ -54,7 +71,10 @@ export default function Home() {
       collection_type: collectionType,
       limit: 50,
     })
-      .then((data) => setTrends(data.items))
+      .then((data) => {
+        setTrends(data.items);
+        setTabCounts((prev) => ({ ...prev, [collectionType]: data.total }));
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [selectedNicheId, isSearching, collectionType]);
@@ -77,7 +97,7 @@ export default function Home() {
     setHasSearched(false);
   };
 
-  const handleCollectionTypeChange = (ct: "now" | "daily" | "weekly") => {
+  const handleCollectionTypeChange = (ct: "now" | "daily" | "weekly" | "rising") => {
     setCollectionType(ct);
   };
 
@@ -167,6 +187,9 @@ export default function Home() {
                 }`}
               >
                 {tab.label}
+                {tabCounts[tab.value] !== undefined && (
+                  <span className="ml-1.5 text-xs opacity-70">({tabCounts[tab.value]})</span>
+                )}
               </button>
             ))}
           </div>
