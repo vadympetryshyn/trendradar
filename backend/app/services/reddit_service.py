@@ -98,7 +98,7 @@ class RedditService:
 
     def fetch_subreddit_daily(self, subreddit: str) -> list[dict]:
         endpoints = [
-            f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=25",
+            f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=30",
         ]
         return self._fetch_endpoints(subreddit, endpoints)
 

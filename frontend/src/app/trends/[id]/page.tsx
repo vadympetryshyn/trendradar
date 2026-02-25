@@ -15,23 +15,34 @@ import { getTrend } from "@/lib/api";
 import { MarkdownContent } from "@/components/markdown-content";
 import type { TrendDetail } from "@/lib/types";
 import { stripSubredditPrefix } from "@/lib/format";
+import { COLLECTION_TYPE_STYLES } from "@/lib/constants";
 
 export default function TrendDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [trend, setTrend] = useState<TrendDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [researching, setResearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const id = params.id as string;
 
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    getTrend(id)
+  const fetchTrend = (webSearch = false) => {
+    if (webSearch) setResearching(true);
+    else setLoading(true);
+
+    getTrend(id, webSearch)
       .then(setTrend)
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setResearching(false);
+      });
+  };
+
+  useEffect(() => {
+    if (!id) return;
+    fetchTrend();
   }, [id]);
 
   if (loading) {
@@ -84,11 +95,9 @@ export default function TrendDetailPage() {
             </Badge>
             <Badge variant="secondary">{trend.category}</Badge>
             <Badge variant="outline" className={
-              trend.collection_type === "rising"
-                ? "bg-orange-100 text-orange-800 border-orange-200"
-                : "bg-sky-100 text-sky-800 border-sky-200"
+              COLLECTION_TYPE_STYLES[trend.collection_type]?.className ?? "bg-sky-100 text-sky-800 border-sky-200"
             }>
-              {trend.collection_type === "now" ? "Now" : trend.collection_type === "rising" ? "Rising" : trend.collection_type === "daily" ? "Daily" : "Weekly"}
+              {COLLECTION_TYPE_STYLES[trend.collection_type]?.label ?? trend.collection_type}
             </Badge>
             <Badge
               variant="outline"
@@ -142,25 +151,52 @@ export default function TrendDetailPage() {
         </Card>
       )}
 
-      {/* Research Context (read-only) */}
-      {trend.research_done && trend.context_summary && (
-        <Card>
-          <CardHeader>
+      {/* Research Context */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1.5">
             <CardTitle>Research Context</CardTitle>
             <CardDescription>
-              Researched at {new Date(trend.researched_at!).toLocaleString()}
+              {trend.research_done
+                ? `Researched at ${new Date(trend.researched_at!).toLocaleString()}`
+                : "On-demand research via Perplexity AI"}
             </CardDescription>
-          </CardHeader>
-          <CardContent>
+          </div>
+          {!trend.research_done && (
+            <Button
+              size="sm"
+              onClick={() => fetchTrend(true)}
+              disabled={researching}
+            >
+              {researching ? "Researching..." : "Research This Trend"}
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          {researching && (
+            <div className="flex items-center gap-3 py-8 text-muted-foreground">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
+              <span>
+                Researching with Perplexity AI... This may take 5-15 seconds.
+              </span>
+            </div>
+          )}
+          {!researching && trend.context_summary && (
             <div className="max-w-none">
               <MarkdownContent
                 content={trend.context_summary}
                 citations={trend.research_citations}
               />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+          {!researching && !trend.context_summary && !trend.research_done && (
+            <p className="text-sm text-muted-foreground py-4">
+              Click &quot;Research This Trend&quot; to get detailed context from
+              Perplexity AI.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Sources */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

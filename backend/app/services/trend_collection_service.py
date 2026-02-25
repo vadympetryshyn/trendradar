@@ -33,6 +33,12 @@ class TrendCollectionService:
         stats_rows = self.db.query(SubredditStats).all()
         stats_map = {s.subreddit: s for s in stats_rows}
 
+        # Fallback baseline from current batch (used when no per-subreddit stats exist)
+        all_scores = [p["score"] for p in all_posts if p.get("score", 0) > 0]
+        all_comments = [p["num_comments"] for p in all_posts if p.get("num_comments", 0) > 0]
+        fallback_avg_score = sum(all_scores) / len(all_scores) if all_scores else 1.0
+        fallback_avg_comments = sum(all_comments) / len(all_comments) if all_comments else 1.0
+
         # First pass: compute normalized engagement for each trend
         trend_engagements = []
         trend_details = []
@@ -51,12 +57,19 @@ class TrendCollectionService:
                 stats = stats_map.get(sub)
                 score = p.get("score", 0)
                 comments = p.get("num_comments", 0)
-                norm_score = score / stats.avg_score if stats and stats.avg_score > 0 else score
-                norm_comments = comments / stats.avg_comments if stats and stats.avg_comments > 0 else comments
+                base_score = stats.avg_score if stats and stats.avg_score > 0 else fallback_avg_score
+                base_comments = stats.avg_comments if stats and stats.avg_comments > 0 else fallback_avg_comments
+                norm_score = score / base_score
+                norm_comments = comments / base_comments
                 normalized_posts.append(norm_score + norm_comments)
 
-            # Average (not sum) so fewer but more anomalous posts rank higher
-            engagement = sum(normalized_posts) / len(normalized_posts) if normalized_posts else 0.0
+            # Peak engagement from strongest source post
+            # (don't let weakly related posts dilute a breakout)
+            peak = max(normalized_posts) if normalized_posts else 0.0
+            # Small cross-subreddit diversity boost
+            unique_subs = len(set(p.get("subreddit", "") for p in valid_posts))
+            cross_sub_boost = min((unique_subs - 1) * 0.2, 0.5)
+            engagement = peak + cross_sub_boost
 
             trend_engagements.append(engagement)
             trend_details.append({
@@ -225,7 +238,7 @@ class TrendCollectionService:
                 skip_age_old += 1
                 continue
             score = p.get("score", 0)
-            if score < 2:
+            if score < 20:
                 skip_low_score += 1
                 continue
 
@@ -263,6 +276,23 @@ class TrendCollectionService:
 
         filtered.sort(key=lambda x: x.get("velocity_ratio", 0), reverse=True)
         return filtered
+
+    def _annotate_engagement_ratios(self, posts: list[dict]) -> None:
+        """Annotate posts with engagement_ratio vs subreddit baseline (from SubredditStats)."""
+        stats_rows = self.db.query(SubredditStats).all()
+        stats_map = {s.subreddit: s for s in stats_rows}
+        if not stats_map:
+            return
+
+        for p in posts:
+            sub = p.get("subreddit", "")
+            stats = stats_map.get(sub)
+            if not stats or stats.avg_score <= 0:
+                continue
+            baseline = stats.avg_score + (stats.avg_comments or 0)
+            if baseline > 0:
+                ratio = (p.get("score", 0) + p.get("num_comments", 0)) / baseline
+                p["engagement_ratio"] = round(ratio, 1)
 
     def _run_rising_detection(
         self,
@@ -374,6 +404,10 @@ class TrendCollectionService:
             if not all_posts:
                 logger.warning(f"No posts fetched for niche {niche_id} — aborting collection")
                 return {"created": 0, "expired": 0}
+
+            # Annotate posts with engagement ratio vs subreddit baselines
+            if collection_type == "now":
+                self._annotate_engagement_ratios(all_posts)
 
             logger.info(f"Step 2: Analyzing {len(all_posts)} posts with Gemini ({collection_type}) ...")
             result = gemini.analyze_posts(

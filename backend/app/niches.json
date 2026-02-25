@@ -2,7 +2,7 @@
   {
     "name": "AI",
     "slug": "ai",
-    "description": "Artificial intelligence, machine learning, deep learning, large language models, generative AI, computer vision, and AI ethics. Covers research breakthroughs, product launches, open-source tools, and industry developments.",
+    "description": "Artificial intelligence, agents, machine learning, deep learning, LLMs, computer vision, and AI ethics. Covers research breakthroughs, product launches, open-source tools, and industry developments. Important topics are releases of new models and significant updates of tools, services, agents, features.",
     "subreddits": [
       "ChatGPT",
       "LocalLLaMA",
@@ -19,7 +19,6 @@
       "PromptEngineering",
       "learnmachinelearning",
       "openclaw",
-      "technology",
       "AIToolTesting",
       "Cursor",
       "ClaudeCode",

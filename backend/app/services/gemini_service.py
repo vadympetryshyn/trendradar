@@ -53,6 +53,7 @@ class GeminiService:
 
 CRITICAL RULES:
 - Each trend MUST focus on ONE specific topic, event, product, or development. Don't combine multiple unrelated news items into a single trend.
+- Some posts include an "engagement_ratio" (e.g. 3.2x) showing how many times more engagement they have compared to their subreddit's average. Posts with high engagement_ratio are breakout content — pay special attention to these and make sure they appear as trends even if only one post covers the topic.
 
 For each trend, provide:
 - title: A concise, specific title for the trend (name the specific product/event/topic)
@@ -234,9 +235,11 @@ Here are the rising Reddit posts to analyze:
         now = time.time()
         for p in posts:
             age_hours = (now - p.get("created_utc", now)) / 3600
+            stats = f"score: {p['score']}, comments: {p['num_comments']}, age: {age_hours:.1f}h"
+            if p.get("engagement_ratio"):
+                stats += f", engagement_ratio: {p['engagement_ratio']}x"
             posts_text = (
-                f"[id:{p['id']}] [r/{p['subreddit']}] "
-                f"(score: {p['score']}, comments: {p['num_comments']}, age: {age_hours:.1f}h)\n"
+                f"[id:{p['id']}] [r/{p['subreddit']}] ({stats})\n"
                 f"Title: {p['title']}\n"
             )
             if p.get("selftext"):
