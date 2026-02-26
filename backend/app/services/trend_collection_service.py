@@ -106,6 +106,12 @@ class TrendCollectionService:
             for p in all_posts
             if p.get("permalink")
         }
+        # External article URLs from link posts (not Reddit permalinks)
+        post_external_url_map = {
+            p["id"]: p["url"]
+            for p in all_posts
+            if p.get("url")
+        }
         post_title_map = {p["id"]: p.get("title", "") for p in all_posts}
 
         computed = self._compute_metrics(trends_data, all_posts)
@@ -115,11 +121,20 @@ class TrendCollectionService:
 
         for trend_data, metrics in zip(trends_data, computed):
             source_post_ids = metrics["source_post_ids"]
+            # Reddit discussion URLs
             source_urls = [
                 post_url_map[pid]
                 for pid in source_post_ids
                 if pid in post_url_map
             ]
+            # External article URLs (for research)
+            external_urls = [
+                post_external_url_map[pid]
+                for pid in source_post_ids
+                if pid in post_external_url_map
+            ]
+            # Append external URLs to source_urls so they're available for Perplexity research
+            source_urls.extend(external_urls)
 
             trend = Trend(
                 niche_id=niche_id,
@@ -467,7 +482,9 @@ class TrendCollectionService:
         if web_search and not trend.research_done:
             logger.info(f"Researching trend '{trend.title}' via Perplexity ...")
             perplexity = PerplexityService()
-            context, citations = perplexity.research_trend(trend.title, trend.summary, trend.key_points)
+            context, citations = perplexity.research_trend(
+                trend.title, trend.summary, trend.key_points, trend.source_urls
+            )
             if context:
                 logger.info(f"Perplexity returned {len(citations)} citations, updating trend ...")
                 trend.context_summary = context

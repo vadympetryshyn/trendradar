@@ -30,10 +30,14 @@ class ExternalTrendDetail(BaseModel):
     niche_id: int
     title: str
     summary: str
+    source_post_ids: list[str] = []
     status: str
     sentiment: str
     category: str
     key_points: list[str]
+    source_urls: list[str]
+    source_subreddits: list[str]
+    mention_count: int
     relevance_score: float
     collection_type: str
     research_done: bool

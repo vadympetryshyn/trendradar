@@ -8,15 +8,9 @@ logger = logging.getLogger(__name__)
 
 PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
 
-RESEARCH_PROMPT = """You are a research assistant. Given the following trend from Reddit discussions, provide comprehensive factual context.
+RESEARCH_SYSTEM_PROMPT = """You are a research assistant providing factual context about trending topics.
 
-IMPORTANT: Your research must cover TWO aspects:
-1. **The specific event/topic** described in the trend (e.g. if the trend is about a model being released on a website, research that specific event — when it happened, what was announced, community reaction)
-2. **Background context** about the subject matter (e.g. if it's about a new AI model, include its specs, capabilities, benchmarks, how it compares to competitors)
-
-Do NOT only research the general subject — always prioritize the specific event or development that the trend is about.
-
-Include:
+When responding, cover these aspects:
 1. What specifically happened (the event/announcement/development)
 2. Key numbers, statistics, or data points
 3. Notable quotes or statements from key figures
@@ -25,29 +19,39 @@ Include:
 6. Brief timeline of recent developments
 
 Keep your response concise (under 3000 characters). Focus on facts, not opinions.
+Always prioritize the specific event or development, not just general background."""
 
-Trend Title: {title}
-Trend Summary: {summary}
-{key_points_section}"""
+RESEARCH_QUERY = """{title}. {summary}{source_urls_section}"""
 
 
 class PerplexityService:
     def __init__(self):
         self.api_key = settings.perplexity_api_key
 
-    def research_trend(self, title: str, summary: str, key_points: list[str] | None = None) -> tuple[str | None, list[str]]:
+    def research_trend(
+        self,
+        title: str,
+        summary: str,
+        key_points: list[str] | None = None,
+        source_urls: list[str] | None = None,
+    ) -> tuple[str | None, list[str]]:
         """Returns (content, citations) tuple."""
         if not self.api_key:
             logger.warning("Perplexity API key not configured, skipping research")
             return None, []
 
         try:
-            key_points_section = ""
-            if key_points:
-                points_text = "\n".join(f"- {p}" for p in key_points)
-                key_points_section = f"Key Points:\n{points_text}"
+            source_urls_section = ""
+            if source_urls:
+                external_urls = [u for u in source_urls if "reddit.com" not in u]
+                if external_urls:
+                    source_urls_section = " Source: " + external_urls[0]
 
-            prompt = RESEARCH_PROMPT.format(title=title, summary=summary, key_points_section=key_points_section)
+            query = RESEARCH_QUERY.format(
+                title=title,
+                summary=summary,
+                source_urls_section=source_urls_section,
+            )
 
             with httpx.Client(timeout=60.0) as client:
                 response = client.post(
@@ -59,7 +63,8 @@ class PerplexityService:
                     json={
                         "model": "sonar",
                         "messages": [
-                            {"role": "user", "content": prompt}
+                            {"role": "system", "content": RESEARCH_SYSTEM_PROMPT},
+                            {"role": "user", "content": query},
                         ],
                         "max_tokens": 1024,
                     },

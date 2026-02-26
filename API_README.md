@@ -1,4 +1,4 @@
-# TrendsRadar External API
+# TrendsRadar API
 
 Base URL: `/api/v1`
 
@@ -68,10 +68,14 @@ GET /api/v1/trends/{trend_id}
   "niche_id": 1,
   "title": "Trend title",
   "summary": "Short summary",
+  "source_post_ids": ["post-1", "post-2"],
   "status": "active",
   "sentiment": "positive",
   "category": "technology",
   "key_points": ["point 1", "point 2"],
+  "source_urls": ["https://reddit.com/r/example/..."],
+  "source_subreddits": ["technology", "programming"],
+  "mention_count": 5,
   "relevance_score": 0.85,
   "collection_type": "now",
   "research_done": true,
@@ -148,4 +152,38 @@ Returns all active niches (without subreddit details).
   }
 ]
 ```
+
+| Field         | Type     | Description                  |
+|---------------|----------|------------------------------|
+| `id`          | int      | Niche ID                     |
+| `name`        | string   | Display name                 |
+| `slug`        | string   | URL-friendly identifier      |
+| `description` | string   | Short description            |
+| `is_active`   | bool     | Whether the niche is active  |
+| `created_at`  | datetime | Creation timestamp           |
+
+---
+
+### List Collection Types
+
+```
+GET /api/v1/niches/collection-types
+```
+
+Returns the available trend collection types.
+
+**Response:**
+
+```json
+[
+  { "value": "now", "label": "Trends Now" },
+  { "value": "daily", "label": "Trends Today" },
+  { "value": "weekly", "label": "Trends This Week" }
+]
+```
+
+| Field   | Type   | Description                                      |
+|---------|--------|--------------------------------------------------|
+| `value` | string | Collection type value to use in API queries       |
+| `label` | string | Human-readable label                              |
 

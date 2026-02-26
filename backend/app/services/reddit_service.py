@@ -69,6 +69,11 @@ class RedditService:
                     if len(selftext) > 2000:
                         selftext = selftext[:2000].rsplit(" ", 1)[0]
 
+                    # Capture external URL for link posts (not self posts)
+                    external_url = post.get("url", "")
+                    if external_url and post.get("is_self", False):
+                        external_url = ""
+
                     posts.append({
                         "id": post_id,
                         "title": post.get("title", ""),
@@ -77,6 +82,7 @@ class RedditService:
                         "num_comments": post.get("num_comments", 0),
                         "subreddit": post.get("subreddit", subreddit),
                         "permalink": post.get("permalink", ""),
+                        "url": external_url,
                         "created_utc": post.get("created_utc", 0),
                     })
             except Exception as e:
