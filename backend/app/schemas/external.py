@@ -86,6 +86,13 @@ class ExternalTrendSearchResponse(BaseModel):
     query: str
 
 
+class VectorSearchRequest(BaseModel):
+    embedding: list[float]
+    collection_types: list[str] = ["now", "daily"]
+    niche_id: int | None = None
+    limit: int = 5
+
+
 class ExternalNicheResponse(BaseModel):
     id: int
     name: str

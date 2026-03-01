@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 from datetime import datetime, timezone
 
@@ -23,6 +24,14 @@ def _percentile_rank(values: list[float], value: float) -> float:
 
 
 class TrendCollectionService:
+    # Baseline bounds for engagement normalization.
+    # Floor prevents tiny subreddits from over-amplifying small signals.
+    # Cap prevents large subreddits from suppressing genuinely popular posts.
+    BASELINE_FLOOR_SCORE = 20
+    BASELINE_FLOOR_COMMENTS = 10
+    BASELINE_CAP_SCORE = 200
+    BASELINE_CAP_COMMENTS = 80
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -50,26 +59,50 @@ class TrendCollectionService:
 
             mention_count = len(valid_ids)
 
-            # Per-post normalized engagement
+            # Per-post normalized engagement with bounded baselines
             normalized_posts = []
+            total_raw_engagement = 0
             for p in valid_posts:
                 sub = p.get("subreddit", "")
                 stats = stats_map.get(sub)
                 score = p.get("score", 0)
                 comments = p.get("num_comments", 0)
-                base_score = stats.avg_score if stats and stats.avg_score > 0 else fallback_avg_score
-                base_comments = stats.avg_comments if stats and stats.avg_comments > 0 else fallback_avg_comments
+
+                total_raw_engagement += score + comments
+
+                raw_base_score = stats.avg_score if stats and stats.avg_score > 0 else fallback_avg_score
+                raw_base_comments = stats.avg_comments if stats and stats.avg_comments > 0 else fallback_avg_comments
+
+                # Clamp baselines: floor prevents over-amplification from tiny subs,
+                # cap prevents over-suppression from mega subs
+                base_score = max(min(raw_base_score, self.BASELINE_CAP_SCORE), self.BASELINE_FLOOR_SCORE)
+                base_comments = max(min(raw_base_comments, self.BASELINE_CAP_COMMENTS), self.BASELINE_FLOOR_COMMENTS)
+
                 norm_score = score / base_score
                 norm_comments = comments / base_comments
                 normalized_posts.append(norm_score + norm_comments)
 
-            # Peak engagement from strongest source post
-            # (don't let weakly related posts dilute a breakout)
-            peak = max(normalized_posts) if normalized_posts else 0.0
-            # Small cross-subreddit diversity boost
+            # Weighted top-3 engagement: strong secondary posts contribute,
+            # not just the single peak. This rewards trends with multiple
+            # high-engagement posts (e.g. 7 posts about nano banana)
+            # while keeping single-post trends unaffected (weight = 1.0 only).
+            sorted_norms = sorted(normalized_posts, reverse=True)
+            top_weights = [1.0, 0.5, 0.25]
+            weighted_peak = sum(
+                n * w for n, w in zip(sorted_norms, top_weights)
+            ) if sorted_norms else 0.0
+
+            # Cross-subreddit diversity boost
             unique_subs = len(set(p.get("subreddit", "") for p in valid_posts))
             cross_sub_boost = min((unique_subs - 1) * 0.2, 0.5)
-            engagement = peak + cross_sub_boost
+
+            # Absolute engagement bonus using TOTAL raw engagement across
+            # all posts — captures cumulative volume, not just the best post.
+            # Single-post trends: total = max (no change).
+            # Multi-post trends: naturally boosted by combined volume.
+            absolute_bonus = math.log2(total_raw_engagement + 1) * 0.1 if total_raw_engagement > 0 else 0.0
+
+            engagement = weighted_peak + cross_sub_boost + absolute_bonus
 
             trend_engagements.append(engagement)
             trend_details.append({

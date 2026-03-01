@@ -26,6 +26,7 @@ from app.schemas.external import (
     ExternalTrendSearchResult,
     ExternalTrendSearchResponse,
     ExternalNicheResponse,
+    VectorSearchRequest,
 )
 
 __all__ = [
@@ -51,4 +52,5 @@ __all__ = [
     "ExternalTrendSearchResult",
     "ExternalTrendSearchResponse",
     "ExternalNicheResponse",
+    "VectorSearchRequest",
 ]

@@ -7,7 +7,7 @@ from app.database import SessionLocal
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=60, soft_time_limit=600, time_limit=660)
 def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None, collection_type: str = "now"):
     from app.models import CollectionTask, ScheduleConfig
     from app.services.trend_collection_service import TrendCollectionService
@@ -113,23 +113,42 @@ def run_scheduled_collections():
                 elapsed = (now - config.last_run_at).total_seconds() / 60
                 should_run = elapsed >= config.interval_minutes
 
-            if should_run:
-                # Create task record first
-                task_record = CollectionTask(
-                    niche_id=config.niche_id,
-                    collection_type=config.collection_type,
-                    status="queued",
-                )
-                db.add(task_record)
-                db.commit()
-                db.refresh(task_record)
+            if not should_run:
+                continue
 
-                collect_niche_trends.delay(config.niche_id, task_record.id, config.collection_type)
-                dispatched += 1
-                logger.info(
-                    f"Dispatched collection for niche {config.niche_id} "
-                    f"(collection_type={config.collection_type})"
+            # Skip if a task is already running/queued for this niche+collection_type
+            existing = (
+                db.query(CollectionTask)
+                .filter(
+                    CollectionTask.niche_id == config.niche_id,
+                    CollectionTask.collection_type == config.collection_type,
+                    CollectionTask.status.in_(["queued", "running"]),
                 )
+                .first()
+            )
+            if existing:
+                logger.info(
+                    f"Skipping niche {config.niche_id} ({config.collection_type}): "
+                    f"task #{existing.id} already {existing.status}"
+                )
+                continue
+
+            # Create task record first
+            task_record = CollectionTask(
+                niche_id=config.niche_id,
+                collection_type=config.collection_type,
+                status="queued",
+            )
+            db.add(task_record)
+            db.commit()
+            db.refresh(task_record)
+
+            collect_niche_trends.delay(config.niche_id, task_record.id, config.collection_type)
+            dispatched += 1
+            logger.info(
+                f"Dispatched collection for niche {config.niche_id} "
+                f"(collection_type={config.collection_type})"
+            )
 
         logger.info(f"Scheduled check complete: {dispatched} collections dispatched")
         return {"dispatched": dispatched}

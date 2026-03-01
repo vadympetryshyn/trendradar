@@ -9,6 +9,7 @@ router = APIRouter(prefix="/niches", tags=["niches"])
 
 COLLECTION_TYPES = [
     {"value": "now", "label": "Trends Now"},
+    {"value": "rising", "label": "Rising Trends"},
     {"value": "daily", "label": "Trends Today"},
     {"value": "weekly", "label": "Trends This Week"},
 ]

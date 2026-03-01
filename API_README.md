@@ -15,7 +15,7 @@ GET /api/v1/trends
 | Parameter         | Type    | Default  | Description                        |
 |-------------------|---------|----------|------------------------------------|
 | `niche_id`        | int     | —        | Filter by niche                    |
-| `collection_type` | string  | —        | Filter: `now`, `daily`, `weekly`   |
+| `collection_type` | string  | —        | Filter: `now`, `rising`, `daily`, `weekly` |
 | `status`          | string  | `active` | Filter: `active`, `expired`        |
 | `limit`           | int     | 20       | Results per page (1–100)           |
 | `offset`          | int     | 0        | Pagination offset                  |
@@ -130,6 +130,76 @@ Only `query` is required. `niche_id` and `limit` are optional.
 
 ---
 
+### Search Trends by Vector
+
+```
+POST /api/v1/trends/search-by-vector
+```
+
+Find the most relevant trends using a pre-computed embedding vector. This skips the embedding generation step, making it faster and ideal for services that already have vectorized data (e.g. Postory).
+
+By default searches only `now` and `daily` trends and returns 5 results.
+
+**Request Body:**
+
+```json
+{
+  "embedding": [0.0123, -0.0456, 0.0789, "... (1536 floats)"],
+  "collection_types": ["now", "daily"],
+  "niche_id": 1,
+  "limit": 5
+}
+```
+
+| Field              | Type         | Required | Default            | Description                                  |
+|--------------------|--------------|----------|--------------------|----------------------------------------------|
+| `embedding`        | float[]      | yes      | —                  | Pre-computed embedding vector (1536 dimensions, OpenAI `text-embedding-3-small` compatible) |
+| `collection_types` | string[]     | no       | `["now", "daily"]` | Which trend types to search: `now`, `rising`, `daily`, `weekly` |
+| `niche_id`         | int          | no       | —                  | Filter by niche                              |
+| `limit`            | int          | no       | 5                  | Number of results to return                  |
+
+**Response:**
+
+```json
+{
+  "results": [
+    {
+      "id": "abc-123",
+      "title": "Trend title",
+      "summary": "Short summary",
+      "sentiment": "positive",
+      "category": "technology",
+      "relevance_score": 0.85,
+      "collection_type": "now",
+      "similarity": 0.9231,
+      "collected_at": "2025-01-15T12:00:00"
+    }
+  ],
+  "query": "vector_search"
+}
+```
+
+**Example (Python):**
+
+```python
+import requests
+
+response = requests.post(
+    "https://your-api/api/v1/trends/search-by-vector",
+    json={
+        "embedding": user_niche_vector,  # 1536-dim float list
+        "limit": 5,
+    },
+)
+trends = response.json()["results"]
+```
+
+**Notes:**
+- The embedding must be 1536 dimensions (matching OpenAI `text-embedding-3-small`). A `422` error is returned if the dimension count is wrong.
+- Similarity is cosine similarity (0–1, higher = more relevant).
+
+---
+
 ### List Niches
 
 ```
@@ -177,6 +247,7 @@ Returns the available trend collection types.
 ```json
 [
   { "value": "now", "label": "Trends Now" },
+  { "value": "rising", "label": "Rising Trends" },
   { "value": "daily", "label": "Trends Today" },
   { "value": "weekly", "label": "Trends This Week" }
 ]

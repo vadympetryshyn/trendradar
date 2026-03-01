@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Trend
+from app.config import settings
 from app.schemas import (
     ExternalTrendDetail,
     ExternalTrendListItem,
@@ -12,6 +13,7 @@ from app.schemas import (
     ExternalTrendSearchResponse,
     ExternalTrendSearchResult,
     TrendSearchRequest,
+    VectorSearchRequest,
 )
 from app.services.embedding_service import EmbeddingService, get_embedding_service
 from app.services.trend_collection_service import TrendCollectionService
@@ -104,4 +106,49 @@ def search_trends(
             for trend, distance in results
         ],
         query=request.query,
+    )
+
+
+@router.post("/search-by-vector", response_model=ExternalTrendSearchResponse)
+def search_trends_by_vector(
+    request: VectorSearchRequest,
+    db: Session = Depends(get_db),
+):
+    expected_dim = settings.embedding_dimensions
+    if len(request.embedding) != expected_dim:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Embedding must have {expected_dim} dimensions, got {len(request.embedding)}",
+        )
+
+    query = db.query(
+        Trend,
+        Trend.embedding.cosine_distance(request.embedding).label("distance"),
+    ).filter(
+        Trend.embedding.isnot(None),
+        Trend.status == "active",
+        Trend.collection_type.in_(request.collection_types),
+    )
+
+    if request.niche_id is not None:
+        query = query.filter(Trend.niche_id == request.niche_id)
+
+    results = query.order_by("distance").limit(request.limit).all()
+
+    return ExternalTrendSearchResponse(
+        results=[
+            ExternalTrendSearchResult(
+                id=str(trend.id),
+                title=trend.title,
+                summary=trend.summary,
+                sentiment=trend.sentiment,
+                category=trend.category,
+                relevance_score=trend.relevance_score,
+                collection_type=trend.collection_type,
+                similarity=round(1 - distance, 4),
+                collected_at=trend.collected_at,
+            )
+            for trend, distance in results
+        ],
+        query="vector_search",
     )

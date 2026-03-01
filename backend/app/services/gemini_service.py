@@ -8,7 +8,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-3-flash-preview"
+GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
@@ -54,6 +54,7 @@ class GeminiService:
 CRITICAL RULES:
 - Each trend MUST focus on ONE specific topic, event, product, or development. Don't combine multiple unrelated news items into a single trend.
 - Some posts include an "engagement_ratio" (e.g. 3.2x) showing how many times more engagement they have compared to their subreddit's average. Posts with high engagement_ratio are breakout content — pay special attention to these and make sure they appear as trends even if only one post covers the topic.
+- source_post_ids MUST only contain post IDs that are genuinely about the trend topic. Do NOT include unrelated posts — carefully verify each post's title and content actually matches the trend before adding its ID. A wrong source_post_id corrupts the trend data.
 
 For each trend, provide:
 - title: A concise, specific title for the trend (name the specific product/event/topic)
@@ -62,7 +63,7 @@ For each trend, provide:
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
 - key_points: An array of 2-5 key points about this trend
 - source_subreddits: An array of subreddit names where this trend appeared
-- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
+- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
 Identify between 5 and 20 trends, ordered by significance (highest first).
 
@@ -95,6 +96,7 @@ CRITICAL RULES:
 - For example, if there are posts about "Qwen 3.5 release" and "Liquid AI new model", these MUST be separate trends — do NOT merge them into "New Model Releases" or similar umbrella trends.
 - Only group posts together if they are genuinely about the SAME specific thing (e.g. multiple posts discussing Qwen 3.5 specifically).
 - Prefer more specific trends over fewer generic ones.
+- source_post_ids MUST only contain post IDs that are genuinely about the trend topic. Do NOT include unrelated posts — carefully verify each post's title and content actually matches the trend before adding its ID. A wrong source_post_id corrupts the trend data.
 
 For each trend, provide:
 - title: A concise, specific title for the trend (name the specific product/event/topic)
@@ -103,7 +105,7 @@ For each trend, provide:
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
 - key_points: An array of 2-5 key points about this trend
 - source_subreddits: An array of subreddit names where this trend appeared
-- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
+- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
 Identify between 5 and 30 trends, ordered by significance (highest first).
 
@@ -136,6 +138,7 @@ CRITICAL RULES:
 - For example, if there are posts about "Qwen 3.5 release" and "Liquid AI new model", these MUST be separate trends — do NOT merge them into "New Model Releases" or similar umbrella trends.
 - Only group posts together if they are genuinely about the SAME specific thing (e.g. multiple posts discussing Qwen 3.5 specifically).
 - Prefer more specific trends over fewer generic ones.
+- source_post_ids MUST only contain post IDs that are genuinely about the trend topic. Do NOT include unrelated posts — carefully verify each post's title and content actually matches the trend before adding its ID. A wrong source_post_id corrupts the trend data.
 
 For each trend, provide:
 - title: A concise, specific title for the trend (name the specific product/event/topic)
@@ -144,7 +147,7 @@ For each trend, provide:
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
 - key_points: An array of 2-5 key points about this trend
 - source_subreddits: An array of subreddit names where this trend appeared
-- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
+- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
 Identify between 20 and 50 trends, ordered by significance (highest first).
 
@@ -178,6 +181,7 @@ CRITICAL RULES:
 - Each trend MUST focus on ONE specific topic, event, product, or development.
 - Only identify trends that show genuine rising momentum — not just any new post.
 - It is OK to return an empty trends array if nothing is genuinely rising.
+- source_post_ids MUST only contain post IDs that are genuinely about the trend topic. Do NOT include unrelated posts — carefully verify each post's title and content actually matches the trend before adding its ID. A wrong source_post_id corrupts the trend data.
 
 For each trend, provide:
 - title: A concise, specific title for the trend
@@ -186,7 +190,7 @@ For each trend, provide:
 - category: A category like "Research", "Product Launch", "Open Source", "Ethics", "Industry", "Tutorial", "Discussion", "Regulation", etc.
 - key_points: An array of 2-5 key points about this trend
 - source_subreddits: An array of subreddit names where this trend appeared
-- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend
+- source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
 Identify between 1 and 10 potential rising trends, ordered by significance (highest first). Return an empty trends array if nothing qualifies.
 

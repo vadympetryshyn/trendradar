@@ -4,6 +4,8 @@ import time
 
 import httpx
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 USER_AGENT = "TrendsRadar/1.0 (trend analysis bot)"
@@ -11,11 +13,19 @@ USER_AGENT = "TrendsRadar/1.0 (trend analysis bot)"
 
 class RedditService:
     def __init__(self):
-        self.client = httpx.Client(
-            headers={"User-Agent": USER_AGENT},
-            timeout=30.0,
-            follow_redirects=True,
-        )
+        client_kwargs = {
+            "headers": {"User-Agent": USER_AGENT},
+            "timeout": 30.0,
+            "follow_redirects": True,
+        }
+
+        if settings.dataimpulse_proxy and settings.app_env != "development":
+            client_kwargs["proxy"] = settings.dataimpulse_proxy
+            logger.info("Reddit service using residential proxy")
+        else:
+            logger.info("Reddit service using direct connection (no proxy)")
+
+        self.client = httpx.Client(**client_kwargs)
 
     def _fetch_with_retry(self, url: str, max_retries: int = 3) -> httpx.Response:
         for attempt in range(max_retries):
