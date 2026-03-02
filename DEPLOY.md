@@ -437,7 +437,7 @@ docker compose -f /var/www/trendradar/docker-compose.prod.yml restart celery_wor
 ### Redeploy (after pushing new code)
 ```bash
 cd /var/www/trendradar
-git pull origin main
+sudo git pull origin main
 docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec back alembic upgrade head
