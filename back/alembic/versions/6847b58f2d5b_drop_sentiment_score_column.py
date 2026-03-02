@@ -15,7 +15,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_column("trends", "sentiment_score")
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='trends' AND column_name='sentiment_score'"
+        )
+    ).fetchone()
+    if result:
+        op.drop_column("trends", "sentiment_score")
 
 
 def downgrade() -> None:
