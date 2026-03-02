@@ -78,7 +78,7 @@ export default function AdminPage() {
   }, [hasRunning, fetchData]);
 
   const handleStartScheduler = async () => {
-    const result = await startScheduler(60);
+    const result = await startScheduler();
     setScheduler(result);
   };
 
