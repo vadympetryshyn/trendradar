@@ -27,16 +27,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="TrendsRadar API", lifespan=lifespan)
+app = FastAPI(title="TrendRadar API", lifespan=lifespan)
 
-if settings.app_env == "development":
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 from app.api.v1.router import api_v1_router  # noqa: E402
 
@@ -45,4 +44,4 @@ app.include_router(api_v1_router)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "trendsradar-api"}
+    return {"status": "ok", "service": "trendradar-api"}

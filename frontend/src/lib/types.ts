@@ -112,3 +112,14 @@ export interface CollectionTaskList {
   page: number;
   per_page: number;
 }
+
+export interface UserResponse {
+  id: string;
+  email: string;
+  name: string | null;
+  is_email_verified: boolean;
+  is_admin: boolean;
+  has_password: boolean;
+  created_at: string;
+  updated_at: string;
+}

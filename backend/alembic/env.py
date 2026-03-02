@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from app.config import settings
 from app.database import Base
-from app.models import Niche, Trend, ScheduleConfig, CollectionTask  # noqa: F401
+from app.models import Niche, Trend, ScheduleConfig, CollectionTask, User  # noqa: F401
 
 config = context.config
 

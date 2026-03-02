@@ -4,9 +4,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - NEXT_PUBLIC_API_URL=https://api.trendsradar.com
+        - NEXT_PUBLIC_API_URL=https://api.trendradar.com
     ports:
       - "3005:3000"
+    environment:
+      - SITE_PASSWORD=aSd068222.!222
     depends_on:
       - backend
     restart: unless-stopped
@@ -57,13 +59,13 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: trendsradar
+      POSTGRES_USER: trendradar
       POSTGRES_PASSWORD: CHANGE_ME
-      POSTGRES_DB: trendsradar
+      POSTGRES_DB: trendradar
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trendsradar"]
+      test: ["CMD-SHELL", "pg_isready -U trendradar"]
       interval: 5s
       timeout: 5s
       retries: 5

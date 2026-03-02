@@ -8,7 +8,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "TrendsRadar/1.0 (trend analysis bot)"
+USER_AGENT = "TrendRadar/1.0 (trend analysis bot)"
 
 
 class RedditService:

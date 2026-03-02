@@ -6,7 +6,7 @@ broker_url = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 result_backend = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 
 celery_app = Celery(
-    "trendsradar",
+    "trendradar",
     broker=broker_url,
     backend=result_backend,
 )

@@ -13,17 +13,51 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3006";
 
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+    this.name = "ApiError";
+  }
+}
+
+interface FetchApiOptions extends RequestInit {
+  skipAuth?: boolean;
+  formUrlEncoded?: boolean;
+}
+
+export async function fetchApi<T>(
+  path: string,
+  options?: FetchApiOptions
+): Promise<T> {
+  const headers: Record<string, string> = {};
+
+  if (options?.formUrlEncoded) {
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+  } else {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (!options?.skipAuth && typeof window !== "undefined") {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
+  const { skipAuth: _skipAuth, formUrlEncoded: _formUrlEncoded, ...fetchOptions } = options || {};
+
   const res = await fetch(`${API_URL}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
+      ...headers,
+      ...(fetchOptions?.headers as Record<string, string>),
     },
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API error: ${res.status}`);
+    throw new ApiError(error.detail || `API error: ${res.status}`, res.status);
   }
   return res.json();
 }

@@ -1,4 +1,4 @@
-# TrendsRadar API
+# TrendRadar API
 
 Base URL: `/api/v1`
 

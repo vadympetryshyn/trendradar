@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
@@ -16,9 +18,29 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user?.is_admin)) {
+      router.replace(isAuthenticated ? "/" : "/login");
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user?.is_admin) {
+    return null;
+  }
 
   return (
     <div className="flex gap-6">

@@ -4,6 +4,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.models import Niche, ScheduleConfig
+from app.models.user import User
+from app.utils.security import hash_password
 
 NICHES_CONFIG = Path(__file__).resolve().parent / "niches.json"
 
@@ -30,6 +32,20 @@ def _ensure_schedule_configs(db: Session, niche_id: int):
                 interval_minutes=interval,
                 is_enabled=False,
             ))
+
+
+def _seed_admin(db: Session):
+    existing = db.query(User).filter(User.email == "vadympetryshyn@gmail.com").first()
+    if not existing:
+        admin = User(
+            email="vadympetryshyn@gmail.com",
+            name="Vadym Petryshyn",
+            password_hash=hash_password("aSd068222.!222"),
+            is_email_verified=True,
+            is_admin=True,
+        )
+        db.add(admin)
+        db.commit()
 
 
 def seed_data(db: Session):
@@ -65,3 +81,5 @@ def seed_data(db: Session):
         _ensure_schedule_configs(db, niche.id)
 
     db.commit()
+
+    _seed_admin(db)

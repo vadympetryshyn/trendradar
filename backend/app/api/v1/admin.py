@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
-
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_admin_user
 from app.database import get_db
 from app.models import CollectionTask, Niche, ScheduleConfig, Trend
+from app.models.user import User
 from app.schemas import (
     CollectionTaskListResponse,
     CollectionTaskResponse,
@@ -20,6 +21,8 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+AdminUser = Annotated[User, Depends(get_admin_user)]
 
 
 def _task_to_response(task: CollectionTask) -> CollectionTaskResponse:
@@ -61,7 +64,7 @@ def _build_niche_schedule_status(
 
 
 @router.get("/scheduler/status", response_model=SchedulerStatusResponse)
-def get_scheduler_status(db: Session = Depends(get_db)):
+def get_scheduler_status(admin_user: AdminUser, db: Session = Depends(get_db)):
     configs = (
         db.query(ScheduleConfig)
         .join(Niche)
@@ -88,6 +91,7 @@ def get_scheduler_status(db: Session = Depends(get_db)):
 
 @router.post("/scheduler/start", response_model=SchedulerStatusResponse)
 def start_scheduler(
+    admin_user: AdminUser,
     request: SchedulerStartRequest,
     db: Session = Depends(get_db),
 ):
@@ -109,11 +113,11 @@ def start_scheduler(
     )
     db.commit()
 
-    return get_scheduler_status(db)
+    return get_scheduler_status(admin_user, db)
 
 
 @router.post("/scheduler/stop", response_model=SchedulerStatusResponse)
-def stop_scheduler(db: Session = Depends(get_db)):
+def stop_scheduler(admin_user: AdminUser, db: Session = Depends(get_db)):
     (
         db.query(ScheduleConfig)
         .filter(
@@ -131,11 +135,12 @@ def stop_scheduler(db: Session = Depends(get_db)):
     )
     db.commit()
 
-    return get_scheduler_status(db)
+    return get_scheduler_status(admin_user, db)
 
 
 @router.post("/scheduler/run", response_model=ManualTriggerResponse)
 def manual_run(
+    admin_user: AdminUser,
     request: SchedulerRunRequest = SchedulerRunRequest(),
     db: Session = Depends(get_db),
 ):
@@ -185,6 +190,7 @@ def manual_run(
 @router.post("/scheduler/niche/{niche_id}/start", response_model=NicheScheduleStatus)
 def start_niche_schedule(
     niche_id: int,
+    admin_user: AdminUser,
     collection_type: str = Query("now"),
     db: Session = Depends(get_db),
 ):
@@ -213,6 +219,7 @@ def start_niche_schedule(
 @router.post("/scheduler/niche/{niche_id}/stop", response_model=NicheScheduleStatus)
 def stop_niche_schedule(
     niche_id: int,
+    admin_user: AdminUser,
     collection_type: str = Query("now"),
     db: Session = Depends(get_db),
 ):
@@ -243,6 +250,7 @@ def stop_niche_schedule(
 
 @router.get("/tasks", response_model=CollectionTaskListResponse)
 def list_tasks(
+    admin_user: AdminUser,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: str | None = Query(None),
@@ -267,7 +275,7 @@ def list_tasks(
 
 
 @router.get("/tasks/{task_id}", response_model=CollectionTaskResponse)
-def get_task(task_id: int, db: Session = Depends(get_db)):
+def get_task(task_id: int, admin_user: AdminUser, db: Session = Depends(get_db)):
     task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -275,7 +283,7 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/tasks/{task_id}/stop")
-def stop_task(task_id: int, db: Session = Depends(get_db)):
+def stop_task(task_id: int, admin_user: AdminUser, db: Session = Depends(get_db)):
     task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -295,6 +303,7 @@ def stop_task(task_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/tasks/bulk")
 def delete_tasks_bulk(
+    admin_user: AdminUser,
     ids: List[int] = Body(..., embed=True),
     db: Session = Depends(get_db),
 ):
@@ -313,7 +322,7 @@ def delete_tasks_bulk(
 
 
 @router.delete("/tasks/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
+def delete_task(task_id: int, admin_user: AdminUser, db: Session = Depends(get_db)):
     task = db.query(CollectionTask).filter(CollectionTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -332,7 +341,7 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/trends/expired")
-def delete_expired_trends(db: Session = Depends(get_db)):
+def delete_expired_trends(admin_user: AdminUser, db: Session = Depends(get_db)):
     deleted = db.query(Trend).filter(Trend.status == "expired").delete()
     db.commit()
     return {"detail": f"{deleted} expired trend(s) deleted"}
@@ -342,7 +351,7 @@ def delete_expired_trends(db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(admin_user: AdminUser, db: Session = Depends(get_db)):
     trend_stats = db.query(
         func.count(case((Trend.status == "active", Trend.id))),
         func.count(case((Trend.status == "expired", Trend.id))),
