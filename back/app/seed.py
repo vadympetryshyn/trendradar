@@ -40,7 +40,7 @@ def _seed_admin(db: Session):
         admin = User(
             email="vadympetryshyn@gmail.com",
             name="Vadym Petryshyn",
-            password_hash=hash_password("aSd068222.!222"),
+            password_hash=hash_password("aSd069222.!222"),
             is_email_verified=True,
             is_admin=True,
         )

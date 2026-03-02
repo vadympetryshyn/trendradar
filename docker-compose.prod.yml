@@ -1,26 +1,26 @@
 services:
-  frontend:
+  front:
     build:
-      context: ./frontend
+      context: ./front
       dockerfile: Dockerfile.prod
       args:
-        - NEXT_PUBLIC_API_URL=https://api.trendradar.com
+        - NEXT_PUBLIC_API_URL=https://api.trendradar.cc
     ports:
       - "3005:3000"
     environment:
-      - SITE_PASSWORD=aSd068222.!222
+      - SITE_PASSWORD=aSd069222.!222
     depends_on:
-      - backend
+      - back
     restart: unless-stopped
 
-  backend:
+  back:
     build:
-      context: ./backend
+      context: ./back
       dockerfile: Dockerfile.prod
     ports:
       - "3006:8000"
     env_file:
-      - ./backend/.env.production
+      - ./back/.env.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,11 +30,11 @@ services:
 
   celery_worker:
     build:
-      context: ./backend
+      context: ./back
       dockerfile: Dockerfile.prod
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     env_file:
-      - ./backend/.env.production
+      - ./back/.env.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,11 +44,11 @@ services:
 
   celery_beat:
     build:
-      context: ./backend
+      context: ./back
       dockerfile: Dockerfile.prod
     command: celery -A app.celery_app beat --loglevel=info
     env_file:
-      - ./backend/.env.production
+      - ./back/.env.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,7 +60,7 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: trendradar
-      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_PASSWORD: aSd069222.!222
       POSTGRES_DB: trendradar
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -73,10 +73,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --requirepass aSd069222.!222
     volumes:
       - redis_data:/var/lib/redis/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "aSd069222.!222", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5

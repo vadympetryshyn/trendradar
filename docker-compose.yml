@@ -1,35 +1,35 @@
 services:
-  frontend:
+  front:
     build:
-      context: ./frontend
+      context: ./front
       dockerfile: Dockerfile
     ports:
       - "3005:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3006
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
+      - ./front/src:/app/src
+      - ./front/public:/app/public
     depends_on:
-      - backend
+      - back
     restart: unless-stopped
 
-  backend:
+  back:
     build:
-      context: ./backend
+      context: ./back
       dockerfile: Dockerfile
     ports:
       - "3006:8000"
     env_file:
-      - ./backend/.env.local
+      - ./back/.env.local
     environment:
       - DATABASE_URL=postgresql://trendradar:trendradar@postgres:5432/trendradar
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/alembic:/app/alembic
+      - ./back/app:/app/app
+      - ./back/alembic:/app/alembic
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,19 +39,19 @@ services:
 
   celery_worker:
     build:
-      context: ./backend
+      context: ./back
       dockerfile: Dockerfile
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     env_file:
-      - ./backend/.env.local
+      - ./back/.env.local
     environment:
       - DATABASE_URL=postgresql://trendradar:trendradar@postgres:5432/trendradar
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/alembic:/app/alembic
+      - ./back/app:/app/app
+      - ./back/alembic:/app/alembic
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,19 +61,19 @@ services:
 
   celery_beat:
     build:
-      context: ./backend
+      context: ./back
       dockerfile: Dockerfile
     command: celery -A app.celery_app beat --loglevel=info
     env_file:
-      - ./backend/.env.local
+      - ./back/.env.local
     environment:
       - DATABASE_URL=postgresql://trendradar:trendradar@postgres:5432/trendradar
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/alembic:/app/alembic
+      - ./back/app:/app/app
+      - ./back/alembic:/app/alembic
     depends_on:
       postgres:
         condition: service_healthy
