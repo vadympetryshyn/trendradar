@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { TrendsGrid } from "@/components/trends-grid";
 import { SearchResultCard } from "@/components/search-result-card";
 import { getTrends, getNiches, searchTrends } from "@/lib/api";
@@ -40,16 +39,12 @@ export default function Home() {
     getNiches()
       .then((data) => {
         setNiches(data);
-        if (data.length > 0) {
-          setSelectedNicheId(data[0].id);
-        }
       })
       .catch((err) => setError(err.message));
   }, []);
 
   // Fetch counts for all tabs when niche changes
   useEffect(() => {
-    if (!selectedNicheId) return;
     Promise.all(
       COLLECTION_TABS.map((tab) =>
         getTrends({ niche_id: selectedNicheId, collection_type: tab.value, limit: 1 })
@@ -62,7 +57,6 @@ export default function Home() {
 
   useEffect(() => {
     if (isSearching) return;
-    if (!selectedNicheId) return;
     setLoading(true);
     setError(null);
 
@@ -172,42 +166,41 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Collection type tabs (hidden during search) */}
+      {/* Niche filter + Collection type tabs (hidden during search) */}
       {!isSearching && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            {COLLECTION_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => handleCollectionTypeChange(tab.value)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  collectionType === tab.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-                {tabCounts[tab.value] !== undefined && (
-                  <span className="ml-1.5 text-xs opacity-70">({tabCounts[tab.value]})</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Niche filter (hidden during search) */}
-      {!isSearching && niches.length > 1 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          {niches.map((niche) => (
-            <Badge
-              key={niche.id}
-              variant={selectedNicheId === niche.id ? "default" : "outline"}
-              className="cursor-pointer text-sm px-3 py-1"
-              onClick={() => setSelectedNicheId(niche.id)}
+        <div className="flex items-center gap-2">
+          {niches.length > 0 && (
+            <select
+              value={selectedNicheId ?? ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedNicheId(val === "" ? undefined : Number(val));
+              }}
+              className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              {niche.name}
-            </Badge>
+              <option value="">All Niches</option>
+              {niches.map((niche) => (
+                <option key={niche.id} value={niche.id}>
+                  {niche.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {COLLECTION_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => handleCollectionTypeChange(tab.value)}
+              className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                collectionType === tab.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              {tabCounts[tab.value] !== undefined && (
+                <span className="ml-1.5 text-xs opacity-70">({tabCounts[tab.value]})</span>
+              )}
+            </button>
           ))}
         </div>
       )}

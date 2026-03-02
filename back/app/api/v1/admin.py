@@ -18,6 +18,7 @@ from app.schemas import (
     SchedulerRunRequest,
     SchedulerStartRequest,
     SchedulerStatusResponse,
+    UpdateIntervalRequest,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -92,7 +93,6 @@ def get_scheduler_status(admin_user: AdminUser, db: Session = Depends(get_db)):
 @router.post("/scheduler/start", response_model=SchedulerStatusResponse)
 def start_scheduler(
     admin_user: AdminUser,
-    request: SchedulerStartRequest,
     db: Session = Depends(get_db),
 ):
     (
@@ -105,7 +105,6 @@ def start_scheduler(
         .update(
             {
                 ScheduleConfig.is_enabled: True,
-                ScheduleConfig.interval_minutes: request.interval_minutes,
                 ScheduleConfig.updated_at: datetime.now(timezone.utc),
             },
             synchronize_session="fetch",
@@ -232,6 +231,36 @@ def stop_niche_schedule(
         raise HTTPException(status_code=404, detail="Schedule not found for this niche/collection_type")
 
     config.is_enabled = False
+    config.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(config)
+
+    trend_count = (
+        db.query(func.count(Trend.id))
+        .filter(Trend.niche_id == niche_id, Trend.status == "active", Trend.collection_type == collection_type)
+        .scalar()
+    )
+
+    return _build_niche_schedule_status(config, trend_count)
+
+
+@router.patch("/scheduler/niche/{niche_id}/interval", response_model=NicheScheduleStatus)
+def update_niche_interval(
+    niche_id: int,
+    admin_user: AdminUser,
+    request: UpdateIntervalRequest,
+    collection_type: str = Query("now"),
+    db: Session = Depends(get_db),
+):
+    config = (
+        db.query(ScheduleConfig)
+        .filter(ScheduleConfig.niche_id == niche_id, ScheduleConfig.collection_type == collection_type)
+        .first()
+    )
+    if not config:
+        raise HTTPException(status_code=404, detail="Schedule not found for this niche/collection_type")
+
+    config.interval_minutes = request.interval_minutes
     config.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(config)

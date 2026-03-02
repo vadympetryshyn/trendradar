@@ -61,17 +61,6 @@ export function TrendCard({ trend }: TrendCardProps) {
             {trend.summary}
           </CardDescription>
 
-          {trend.key_points.length > 0 && (
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {trend.key_points.map((point) => (
-                <li key={point} className="flex gap-2">
-                  <span className="text-primary mt-0.5">&#8226;</span>
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
           {trend.source_subreddits.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">
               {trend.source_subreddits.map((sub) => {

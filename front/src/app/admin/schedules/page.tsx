@@ -23,7 +23,7 @@ import {
   stopScheduler,
   startNicheSchedule,
   stopNicheSchedule,
-  runNow,
+  updateNicheInterval,
 } from "@/lib/api";
 import type { SchedulerStatus } from "@/lib/types";
 
@@ -40,8 +40,6 @@ const INTERVAL_OPTIONS = [
 export default function SchedulerPage() {
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedInterval, setSelectedInterval] = useState("60");
-  const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getSchedulerStatus()
@@ -50,7 +48,7 @@ export default function SchedulerPage() {
   }, []);
 
   const handleStart = async () => {
-    const result = await startScheduler(parseInt(selectedInterval));
+    const result = await startScheduler();
     setScheduler(result);
   };
 
@@ -78,18 +76,17 @@ export default function SchedulerPage() {
     });
   };
 
-  const handleRunNiche = async (nicheId: number, collectionType: string) => {
-    const key = `${nicheId}-${collectionType}`;
-    setRunningNiches((prev) => new Set(prev).add(key));
-    try {
-      await runNow(nicheId, collectionType);
-    } finally {
-      setRunningNiches((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-    }
+  const handleIntervalChange = async (nicheId: number, collectionType: string, intervalMinutes: number) => {
+    const result = await updateNicheInterval(nicheId, collectionType, intervalMinutes);
+    setScheduler((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        niches: prev.niches.map((n) =>
+          n.niche_id === nicheId && n.collection_type === collectionType ? result : n
+        ),
+      };
+    });
   };
 
   if (loading) {
@@ -132,28 +129,10 @@ export default function SchedulerPage() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-3">
-            <Select
-              value={selectedInterval}
-              onValueChange={setSelectedInterval}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {INTERVAL_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={String(opt.value)}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {scheduler.running ? (
-              <Button variant="destructive" onClick={handleStop}>
-                Stop All
-              </Button>
-            ) : (
-              <Button onClick={handleStart}>Start All</Button>
-            )}
+            <Button onClick={handleStart}>Enable All</Button>
+            <Button variant="destructive" onClick={handleStop}>
+              Disable All
+            </Button>
           </div>
         </CardHeader>
       </Card>
@@ -181,13 +160,11 @@ export default function SchedulerPage() {
                   </th>
                   <th className="pb-2 pr-4 font-medium">Last Run</th>
                   <th className="pb-2 pr-4 font-medium">Next Run</th>
-                  <th className="pb-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {scheduler.niches.map((niche) => {
                   const nicheKey = `${niche.niche_id}-${niche.collection_type}`;
-                  const isRunning = runningNiches.has(nicheKey);
                   return (
                     <tr key={nicheKey} className="border-b last:border-0">
                       <td className="py-3 pr-4 font-medium">
@@ -214,8 +191,24 @@ export default function SchedulerPage() {
                           {niche.is_enabled ? "Enabled" : "Disabled"}
                         </Button>
                       </td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        Every {niche.interval_minutes} min
+                      <td className="py-3 pr-4">
+                        <Select
+                          value={String(niche.interval_minutes)}
+                          onValueChange={(val) =>
+                            handleIntervalChange(niche.niche_id, niche.collection_type, parseInt(val))
+                          }
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INTERVAL_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={String(opt.value)}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums">
                         {niche.trend_count}
@@ -229,16 +222,6 @@ export default function SchedulerPage() {
                         {niche.is_enabled && niche.next_run_at
                           ? new Date(niche.next_run_at).toLocaleString()
                           : "\u2014"}
-                      </td>
-                      <td className="py-3">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRunNiche(niche.niche_id, niche.collection_type)}
-                          disabled={isRunning}
-                        >
-                          {isRunning ? "Running..." : "Run Now"}
-                        </Button>
                       </td>
                     </tr>
                   );

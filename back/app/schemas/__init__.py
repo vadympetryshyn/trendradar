@@ -14,6 +14,7 @@ from app.schemas.admin import (
     SchedulerRunRequest,
     ManualTriggerResponse,
     DashboardStatsResponse,
+    UpdateIntervalRequest,
 )
 from app.schemas.task import (
     CollectionTaskResponse,
@@ -44,6 +45,7 @@ __all__ = [
     "SchedulerRunRequest",
     "ManualTriggerResponse",
     "DashboardStatsResponse",
+    "UpdateIntervalRequest",
     "CollectionTaskResponse",
     "CollectionTaskListResponse",
     "ExternalTrendListItem",

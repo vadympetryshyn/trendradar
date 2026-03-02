@@ -21,7 +21,11 @@ class SchedulerStatusResponse(BaseModel):
 
 
 class SchedulerStartRequest(BaseModel):
-    interval_minutes: int = 60
+    pass
+
+
+class UpdateIntervalRequest(BaseModel):
+    interval_minutes: int
 
 
 class SchedulerRunRequest(BaseModel):

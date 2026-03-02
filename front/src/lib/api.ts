@@ -128,12 +128,9 @@ export function getSchedulerStatus(): Promise<SchedulerStatus> {
   return fetchApi("/api/v1/admin/scheduler/status");
 }
 
-export function startScheduler(
-  intervalMinutes: number
-): Promise<SchedulerStatus> {
+export function startScheduler(): Promise<SchedulerStatus> {
   return fetchApi("/api/v1/admin/scheduler/start", {
     method: "POST",
-    body: JSON.stringify({ interval_minutes: intervalMinutes }),
   });
 }
 
@@ -166,6 +163,17 @@ export function stopNicheSchedule(
 ): Promise<NicheScheduleStatus> {
   return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/stop?collection_type=${collectionType}`, {
     method: "POST",
+  });
+}
+
+export function updateNicheInterval(
+  nicheId: number,
+  collectionType: string,
+  intervalMinutes: number
+): Promise<NicheScheduleStatus> {
+  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/interval?collection_type=${collectionType}`, {
+    method: "PATCH",
+    body: JSON.stringify({ interval_minutes: intervalMinutes }),
   });
 }
 
