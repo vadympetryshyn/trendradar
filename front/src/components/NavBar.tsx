@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
 export function NavBar() {
+  const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+
+  if (pathname === "/gate") return null;
 
   return (
     <nav className="border-b bg-background">

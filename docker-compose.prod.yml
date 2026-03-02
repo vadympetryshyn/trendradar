@@ -8,7 +8,7 @@ services:
     ports:
       - "3005:3000"
     environment:
-      - SITE_PASSWORD=aSd069222.!222
+      - SITE_PASSWORD=aSd068222.!222
     depends_on:
       - back
     restart: unless-stopped
@@ -60,7 +60,7 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: trendradar
-      POSTGRES_PASSWORD: aSd069222.!222
+      POSTGRES_PASSWORD: aSd068222.!222
       POSTGRES_DB: trendradar
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -73,11 +73,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass aSd069222.!222
+    command: redis-server --requirepass aSd068222.!222
     volumes:
       - redis_data:/var/lib/redis/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "aSd069222.!222", "ping"]
+      test: ["CMD", "redis-cli", "-a", "aSd068222.!222", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
