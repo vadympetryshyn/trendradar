@@ -335,6 +335,7 @@ export default function TasksPage() {
                   </th>
                   <th className="pb-2 pr-4 font-medium w-10">#</th>
                   <th className="pb-2 pr-4 font-medium">Niche</th>
+                  <th className="pb-2 pr-4 font-medium">Type</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
                   <th className="pb-2 pr-4 font-medium text-right">
                     Created
@@ -367,6 +368,11 @@ export default function TasksPage() {
                       </td>
                       <td className="py-3 pr-4 font-medium">
                         {task.niche_name}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Badge variant="outline" className="text-xs">
+                          {task.collection_type}
+                        </Badge>
                       </td>
                       <td className="py-3 pr-4">
                         <span
@@ -467,7 +473,7 @@ export default function TasksPage() {
                 {tasks.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={11}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No tasks found.

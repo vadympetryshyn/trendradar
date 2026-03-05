@@ -342,73 +342,90 @@ class TrendCollectionService:
                 ratio = (p.get("score", 0) + p.get("num_comments", 0)) / baseline
                 p["engagement_ratio"] = round(ratio, 1)
 
-    def _run_rising_detection(
-        self,
-        niche: Niche,
-        reddit: RedditService,
-        gemini: GeminiService,
-        hot_posts: list[dict],
-    ) -> tuple[int, int]:
-        logger.info(f"Rising detection: computing baselines from {len(hot_posts)} hot posts ...")
-        baselines = self._compute_baselines(hot_posts)
-        if not baselines:
-            logger.info("Rising detection: no baselines computed, skipping")
-            expired = self._expire_trends(niche.id, "rising")
-            return 0, expired
+    def collect_rising_trends(self, niche_id: int) -> dict:
+        niche = self.db.query(Niche).filter(Niche.id == niche_id).first()
+        if not niche:
+            raise ValueError(f"Niche with id {niche_id} not found")
 
-        self._upsert_baselines(baselines)
-        logger.info(f"Rising detection: baselines upserted for {len(baselines)} subreddits")
-        for sub, stats in baselines.items():
-            logger.info(
-                f"  Baseline r/{sub}: avg_score={stats['avg_score']:.1f}, "
-                f"avg_comments={stats['avg_comments']:.1f}, "
-                f"avg_velocity={stats['avg_velocity']:.1f}, "
-                f"post_count={stats['post_count']}"
-            )
+        logger.info(f"=== Starting rising trend detection for niche '{niche.name}' (id={niche_id}) ===")
 
-        # Fetch /new posts per subreddit
-        all_new_posts: list[dict] = []
-        for sub in niche.subreddits:
-            if sub not in baselines:
-                logger.info(f"Rising detection: skipping r/{sub} (no baseline)")
-                continue
-            try:
-                new_posts = reddit.fetch_subreddit_new(sub)
-                all_new_posts.extend(new_posts)
-                logger.info(f"Rising detection: fetched {len(new_posts)} /new posts from r/{sub}")
-            except Exception as e:
-                logger.warning(f"Rising detection: failed to fetch /new for r/{sub}: {e}")
-
-        # Filter posts against baselines
-        filtered = self._filter_new_posts(all_new_posts, baselines)
-        logger.info(f"Rising detection: {len(filtered)} posts passed filter (from {len(all_new_posts)} total)")
-
-        # Expire old rising trends regardless
-        expired_count = self._expire_trends(niche.id, "rising")
-        logger.info(f"Rising detection: expired {expired_count} previous rising trends")
-
-        if not filtered:
-            logger.info("Rising detection: no posts passed filter, skipping Gemini call")
-            return 0, expired_count
-
-        # Gemini analysis
-        logger.info(f"Rising detection: analyzing {len(filtered)} posts with Gemini ...")
-        result = gemini.analyze_posts(
-            filtered,
-            niche_name=niche.name,
-            niche_description=niche.description or "",
-            collection_type="rising",
+        # Load baselines from SubredditStats (saved by the preceding "now" collection)
+        stats_rows = (
+            self.db.query(SubredditStats)
+            .filter(SubredditStats.subreddit.in_(niche.subreddits))
+            .all()
         )
-        trends_data = result.get("trends", [])
+        baselines = {
+            s.subreddit: {
+                "avg_score": s.avg_score,
+                "avg_comments": s.avg_comments,
+                "avg_age_hours": s.avg_age_hours,
+                "avg_velocity": s.avg_velocity,
+                "post_count": s.post_count,
+            }
+            for s in stats_rows
+            if s.avg_velocity and s.avg_velocity > 0
+        }
 
-        if not trends_data:
-            logger.info("Rising detection: Gemini returned no rising trends")
-            return 0, expired_count
+        if not baselines:
+            logger.info("Rising detection: no baselines in DB, skipping")
+            expired = self._expire_trends(niche_id, "rising")
+            self.db.commit()
+            return {"created": 0, "expired": expired}
 
-        # Save rising trends
-        new_trends = self._save_trends(trends_data, filtered, niche.id, "rising")
-        logger.info(f"Rising detection: {len(new_trends)} rising trends saved")
-        return len(new_trends), expired_count
+        logger.info(f"Rising detection: loaded baselines for {len(baselines)} subreddits")
+
+        reddit = RedditService()
+        gemini = GeminiService()
+        try:
+            all_new_posts: list[dict] = []
+            for sub in niche.subreddits:
+                if sub not in baselines:
+                    logger.info(f"Rising detection: skipping r/{sub} (no baseline)")
+                    continue
+                try:
+                    new_posts = reddit.fetch_subreddit_new(sub)
+                    all_new_posts.extend(new_posts)
+                    logger.info(f"Rising detection: fetched {len(new_posts)} /new posts from r/{sub}")
+                except Exception as e:
+                    logger.warning(f"Rising detection: failed to fetch /new for r/{sub}: {e}")
+
+            filtered = self._filter_new_posts(all_new_posts, baselines)
+            logger.info(f"Rising detection: {len(filtered)} posts passed filter (from {len(all_new_posts)} total)")
+
+            expired_count = self._expire_trends(niche_id, "rising")
+            logger.info(f"Rising detection: expired {expired_count} previous rising trends")
+
+            if not filtered:
+                logger.info("Rising detection: no posts passed filter, skipping Gemini call")
+                self.db.commit()
+                return {"created": 0, "expired": expired_count}
+
+            logger.info(f"Rising detection: analyzing {len(filtered)} posts with Gemini ...")
+            result = gemini.analyze_posts(
+                filtered,
+                niche_name=niche.name,
+                niche_description=niche.description or "",
+                collection_type="rising",
+            )
+            trends_data = result.get("trends", [])
+
+            if not trends_data:
+                logger.info("Rising detection: Gemini returned no rising trends")
+                self.db.commit()
+                return {"created": 0, "expired": expired_count}
+
+            new_trends = self._save_trends(trends_data, filtered, niche_id, "rising")
+            self.db.commit()
+
+            logger.info(
+                f"=== Rising detection complete for niche '{niche.name}': "
+                f"{len(new_trends)} created, {expired_count} expired ==="
+            )
+            return {"created": len(new_trends), "expired": expired_count}
+        finally:
+            reddit.close()
+            gemini.close()
 
     def _expire_trends(self, niche_id: int, collection_type: str) -> int:
         expired_count = (
@@ -475,17 +492,14 @@ class TrendCollectionService:
             logger.info("Step 4: Saving trends and generating embeddings ...")
             new_trends = self._save_trends(trends_data, all_posts, niche.id, collection_type)
 
-            # Run rising detection embedded in "now" collections
-            rising_created = 0
-            rising_expired = 0
+            # For "now" collections, update subreddit baselines so the separate
+            # rising detection task can use them without re-fetching hot posts.
             if collection_type == "now":
-                try:
-                    logger.info("Step 4b: Running rising trend detection ...")
-                    rising_created, rising_expired = self._run_rising_detection(
-                        niche, reddit, gemini, all_posts
-                    )
-                except Exception as e:
-                    logger.warning(f"Rising detection failed (non-fatal): {e}")
+                logger.info("Step 4b: Updating subreddit baselines ...")
+                baselines = self._compute_baselines(all_posts)
+                if baselines:
+                    self._upsert_baselines(baselines)
+                    logger.info(f"Baselines updated for {len(baselines)} subreddits")
 
             logger.info("Step 5: Committing to database ...")
             self.db.commit()
@@ -494,13 +508,9 @@ class TrendCollectionService:
                 f"=== Collection complete for niche '{niche.name}' ({collection_type}): "
                 f"{len(new_trends)} created, {expired_count} expired ==="
             )
-            if rising_created or rising_expired:
-                logger.info(
-                    f"    Rising: {rising_created} created, {rising_expired} expired"
-                )
             return {
-                "created": len(new_trends) + rising_created,
-                "expired": expired_count + rising_expired,
+                "created": len(new_trends),
+                "expired": expired_count,
             }
 
         finally:
