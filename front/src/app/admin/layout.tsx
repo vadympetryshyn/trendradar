@@ -43,13 +43,13 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex gap-6">
-      <nav className="w-[220px] shrink-0 space-y-1">
+    <div className="flex flex-col md:flex-row gap-6">
+      <nav className="flex md:flex-col md:w-[220px] md:shrink-0 gap-1 overflow-x-auto">
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            className={`block rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               isActive(item.href)
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"

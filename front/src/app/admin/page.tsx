@@ -147,7 +147,7 @@ export default function AdminPage() {
 
       {/* Quick Stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Active Trends</CardDescription>
@@ -208,7 +208,7 @@ export default function AdminPage() {
       {/* Scheduler Status */}
       {scheduler && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 space-y-0">
             <div className="space-y-1.5">
               <CardTitle>Scheduler</CardTitle>
               <CardDescription>
@@ -250,10 +250,10 @@ export default function AdminPage() {
               return (
                 <div
                   key={nicheKey}
-                  className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{niche.niche_name}</span>
                       <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
                         {niche.collection_type}
@@ -268,7 +268,7 @@ export default function AdminPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
                       <span>Every {niche.interval_minutes} min</span>
                       {niche.last_run_at && (
                         <span>
@@ -277,7 +277,7 @@ export default function AdminPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <Button
                       size="sm"
                       variant="outline"
@@ -311,7 +311,7 @@ export default function AdminPage() {
       {/* Recent Tasks */}
       {recentTasks.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 space-y-0">
             <div className="space-y-1.5">
               <CardTitle>Recent Tasks</CardTitle>
               <CardDescription>
@@ -328,9 +328,9 @@ export default function AdminPage() {
               {recentTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-center justify-between gap-4 text-sm rounded-lg border px-4 py-2"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm rounded-lg border px-4 py-2"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[task.status] || "bg-gray-100 text-gray-700"}`}
                     >
