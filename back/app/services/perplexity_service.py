@@ -21,7 +21,7 @@ When responding, cover these aspects:
 Keep your response concise (under 3000 characters). Focus on facts, not opinions.
 Always prioritize the specific event or development, not just general background."""
 
-RESEARCH_QUERY = """{title}. {summary}{source_urls_section}"""
+RESEARCH_QUERY = """{title}. {summary}"""
 
 
 class PerplexityService:
@@ -33,7 +33,6 @@ class PerplexityService:
         title: str,
         summary: str,
         key_points: list[str] | None = None,
-        source_urls: list[str] | None = None,
     ) -> tuple[str | None, list[str]]:
         """Returns (content, citations) tuple."""
         if not self.api_key:
@@ -41,16 +40,9 @@ class PerplexityService:
             return None, []
 
         try:
-            source_urls_section = ""
-            if source_urls:
-                external_urls = [u for u in source_urls if "reddit.com" not in u]
-                if external_urls:
-                    source_urls_section = " Source: " + external_urls[0]
-
             query = RESEARCH_QUERY.format(
                 title=title,
                 summary=summary,
-                source_urls_section=source_urls_section,
             )
 
             with httpx.Client(timeout=60.0) as client:

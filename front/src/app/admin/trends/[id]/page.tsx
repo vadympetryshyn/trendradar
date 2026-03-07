@@ -248,6 +248,27 @@ export default function TrendDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        {trend.mention_urls.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Reddit Mentions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {trend.mention_urls.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-xs text-blue-500 hover:underline truncate"
+                >
+                  {url}
+                </a>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ class Trend(Base):
     category: Mapped[str] = mapped_column(String(100), nullable=False, default="General")
     key_points: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     source_urls: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    mention_urls: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     source_subreddits: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     mention_count: Mapped[int] = mapped_column(Integer, default=0)
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0)

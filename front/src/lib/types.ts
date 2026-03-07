@@ -19,6 +19,7 @@ export interface Trend {
   category: string;
   key_points: string[];
   source_urls: string[];
+  mention_urls: string[];
   source_subreddits: string[];
   mention_count: number;
   relevance_score: number;

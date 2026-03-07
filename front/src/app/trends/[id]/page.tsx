@@ -42,7 +42,12 @@ export default function TrendDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    fetchTrend();
+    getTrend(id, false)
+      .then(setTrend)
+      .catch((err) => setError(err.message))
+      .finally(() => {
+        setLoading(false);
+      });
   }, [id]);
 
   if (loading) {
@@ -53,7 +58,7 @@ export default function TrendDetailPage() {
 
   if (error || !trend) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-4">
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-4">
         <Button variant="outline" size="sm" onClick={() => router.back()}>
           &larr; Back
         </Button>
@@ -63,11 +68,12 @@ export default function TrendDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" onClick={() => router.back()}>
+    <div className="max-w-6xl mx-auto px-4 py-0 space-y-2">
+      <Button variant="outline" size="sm" onClick={() => router.back()}>
           &larr; Back
         </Button>
+      <div className="flex items-center gap-4">
+        
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">{trend.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
@@ -234,6 +240,27 @@ export default function TrendDetailPage() {
             </CardHeader>
             <CardContent className="space-y-1">
               {trend.source_urls.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-xs text-blue-500 hover:underline truncate"
+                >
+                  {url}
+                </a>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {trend.mention_urls.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Reddit Mentions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {trend.mention_urls.map((url, i) => (
                 <a
                   key={i}
                   href={url}

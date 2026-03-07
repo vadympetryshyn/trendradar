@@ -154,20 +154,18 @@ class TrendCollectionService:
 
         for trend_data, metrics in zip(trends_data, computed):
             source_post_ids = metrics["source_post_ids"]
-            # Reddit discussion URLs
-            source_urls = [
+            # Reddit discussion permalinks
+            mention_urls = [
                 post_url_map[pid]
                 for pid in source_post_ids
                 if pid in post_url_map
             ]
-            # External article URLs (for research)
-            external_urls = [
+            # External article URLs
+            source_urls = [
                 post_external_url_map[pid]
                 for pid in source_post_ids
                 if pid in post_external_url_map
             ]
-            # Append external URLs to source_urls so they're available for Perplexity research
-            source_urls.extend(external_urls)
 
             trend = Trend(
                 niche_id=niche_id,
@@ -179,6 +177,7 @@ class TrendCollectionService:
                 category=trend_data.get("category", "General"),
                 key_points=trend_data.get("key_points", []),
                 source_urls=source_urls,
+                mention_urls=mention_urls,
                 source_subreddits=trend_data.get("source_subreddits", []),
                 mention_count=metrics["mention_count"],
                 relevance_score=metrics["relevance_score"],
@@ -526,7 +525,7 @@ class TrendCollectionService:
             logger.info(f"Researching trend '{trend.title}' via Perplexity ...")
             perplexity = PerplexityService()
             context, citations = perplexity.research_trend(
-                trend.title, trend.summary, trend.key_points, trend.source_urls
+                trend.title, trend.summary, trend.key_points
             )
             if context:
                 logger.info(f"Perplexity returned {len(citations)} citations, updating trend ...")

@@ -36,6 +36,7 @@ class ExternalTrendDetail(BaseModel):
     category: str
     key_points: list[str]
     source_urls: list[str]
+    mention_urls: list[str] = []
     source_subreddits: list[str]
     mention_count: int
     relevance_score: float
