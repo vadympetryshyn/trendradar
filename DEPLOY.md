@@ -10,10 +10,10 @@
 ```
 SSH_USER=ubuntu
 SSH_PASSWORD=aSd068222!.$5.
-SSH_HOST=51.210.14.13
+SSH_HOST=ssh ubuntu@vps-5328a322.vps.ovh.net
 ```
 
-**Connect with:** `ssh ubuntu@51.210.14.13`
+**Connect with:** `ssh ubuntu@ssh ubuntu@vps-5328a322.vps.ovh.net`
 
 > **Note:** The SSH password may contain special characters (`!`, `$`). When using `sshpass`, write the password to a file with a file-write tool (not `printf`/`echo` which may escape characters), then use `sshpass -f /path/to/passfile`. All commands on the server require `sudo` since we connect as `ubuntu`, not `root`.
 

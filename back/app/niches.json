@@ -106,5 +106,44 @@
       "CrossFit",
       "weightroom"
     ]
+  },
+  {
+    "name": "Crypto",
+    "slug": "crypto",
+    "description": "Cryptocurrency, blockchain, Bitcoin, Ethereum, altcoins, DeFi, NFTs, and Web3. Covers market analysis, price movements, trading strategies, protocol updates, meme coins, and industry developments across the crypto ecosystem.",
+    "subreddits": [
+      "CryptoCurrency",
+      "Bitcoin",
+      "Dogecoin",
+      "NFT",
+      "CryptoMarkets",
+      "ethereum",
+      "Altcoin",
+      "defi",
+      "CryptoMoonShots",
+      "BitcoinBeginners",
+      "CryptoTechnology",
+      "SatoshiStreetBets",
+      "Cardano",
+      "Solana",
+      "XRP"
+    ],
+    "subreddits_reserve": [
+      "CryptoCurrency",
+      "Bitcoin",
+      "Dogecoin",
+      "NFT",
+      "CryptoMarkets",
+      "ethereum",
+      "Altcoin",
+      "defi",
+      "CryptoMoonShots",
+      "BitcoinBeginners",
+      "CryptoTechnology",
+      "SatoshiStreetBets",
+      "Cardano",
+      "Solana",
+      "XRP"
+    ]
   }
 ]
