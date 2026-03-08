@@ -108,8 +108,8 @@
     ]
   },
   {
-    "name": "Crypto",
-    "slug": "crypto",
+    "name": "Crypto & Web3",
+    "slug": "crypto-web3",
     "description": "Cryptocurrency, blockchain, Bitcoin, Ethereum, altcoins, DeFi, NFTs, and Web3. Covers market analysis, price movements, trading strategies, protocol updates, meme coins, and industry developments across the crypto ecosystem.",
     "subreddits": [
       "CryptoCurrency",
@@ -144,6 +144,55 @@
       "Cardano",
       "Solana",
       "XRP"
+    ]
+  },
+  {
+    "name": "Automotive",
+    "slug": "automotive",
+    "description": "Cars, trucks, EVs, automotive news, repair, buying advice, and car culture. Covers vehicle reviews, DIY maintenance, electric vehicles, market trends, detailing, project builds, and the shift to electrification across the automotive industry.",
+    "subreddits": [
+      "cars",
+      "IdiotsInCars",
+      "Justrolledintotheshop",
+      "MechanicAdvice",
+      "Autos",
+      "whatcarshouldIbuy",
+      "autodetailing",
+      "projectcar",
+      "TeslaMotors",
+      "electricvehicles",
+      "Rivian",
+      "TeslaModel3",
+      "TeslaModelY",
+      "Cybertruck",
+      "BoltEV",
+      "Polestar",
+      "ebikes",
+      "evcharging",
+      "askcarsales",
+      "UsedCars"
+    ],
+    "subreddits_reserve": [
+      "cars",
+      "IdiotsInCars",
+      "Justrolledintotheshop",
+      "MechanicAdvice",
+      "Autos",
+      "whatcarshouldIbuy",
+      "autodetailing",
+      "projectcar",
+      "TeslaMotors",
+      "electricvehicles",
+      "Rivian",
+      "TeslaModel3",
+      "TeslaModelY",
+      "Cybertruck",
+      "BoltEV",
+      "Polestar",
+      "ebikes",
+      "evcharging",
+      "askcarsales",
+      "UsedCars"
     ]
   }
 ]
