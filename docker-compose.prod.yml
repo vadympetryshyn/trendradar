@@ -32,9 +32,14 @@ services:
     build:
       context: ./back
       dockerfile: Dockerfile.prod
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.celery_app worker --loglevel=info --autoscale=10,1
     env_file:
       - ./back/.env.production
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: "2.0"
     depends_on:
       postgres:
         condition: service_healthy

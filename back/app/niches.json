@@ -48,5 +48,63 @@
       "codex",
       "opencodeCLI"
     ]
+  },
+  {
+    "name": "Marketing",
+    "slug": "marketing",
+    "description": "Marketing, advertising, SEO, PPC, social media, content marketing, ecommerce, affiliate marketing, and digital marketing strategy. Covers trends, tools, best practices, campaign optimization, and industry news across all marketing channels.",
+    "subreddits": [
+      "marketing",
+      "socialmedia",
+      "eCommerce",
+      "DigitalMarketing",
+      "Affiliatemarketing",
+      "PPC",
+      "advertising",
+      "Digital_Marketing",
+      "content_marketing",
+      "SEO"
+    ],
+    "subreddits_reserve": [
+      "marketing",
+      "socialmedia",
+      "eCommerce",
+      "DigitalMarketing",
+      "Affiliatemarketing",
+      "PPC",
+      "advertising",
+      "Digital_Marketing",
+      "content_marketing",
+      "SEO"
+    ]
+  },
+  {
+    "name": "Health & Fitness",
+    "slug": "health-fitness",
+    "description": "Health, fitness, nutrition, weight loss, strength training, running, and body transformation. Covers workout routines, meal prep, recovery, progress stories, and community support for all fitness levels and goals.",
+    "subreddits": [
+      "Fitness",
+      "loseit",
+      "Nutrition",
+      "bodyweightfitness",
+      "running",
+      "progresspics",
+      "MealPrepSunday",
+      "xxfitness",
+      "CrossFit",
+      "weightroom"
+    ],
+    "subreddits_reserve": [
+      "Fitness",
+      "loseit",
+      "Nutrition",
+      "bodyweightfitness",
+      "running",
+      "progresspics",
+      "MealPrepSunday",
+      "xxfitness",
+      "CrossFit",
+      "weightroom"
+    ]
   }
 ]

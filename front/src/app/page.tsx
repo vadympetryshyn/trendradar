@@ -14,6 +14,8 @@ const COLLECTION_TABS = [
   { value: "weekly" as const, label: "This Week" },
 ];
 
+const ITEMS_PER_PAGE = 20;
+
 export default function Home() {
   const [niches, setNiches] = useState<Niche[]>([]);
   const [trends, setTrends] = useState<Trend[]>([]);
@@ -26,6 +28,12 @@ export default function Home() {
 
   // Tab counts
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+
+  // Pagination
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const currentPage = Math.floor(offset / ITEMS_PER_PAGE) + 1;
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,15 +71,17 @@ export default function Home() {
     getTrends({
       niche_id: selectedNicheId,
       collection_type: collectionType,
-      limit: 50,
+      limit: ITEMS_PER_PAGE,
+      offset,
     })
       .then((data) => {
         setTrends(data.items);
+        setTotal(data.total);
         setTabCounts((prev) => ({ ...prev, [collectionType]: data.total }));
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [selectedNicheId, isSearching, collectionType]);
+  }, [selectedNicheId, isSearching, collectionType, offset]);
 
   const handleSearch = () => {
     if (searchQuery.trim().length < 2) return;
@@ -93,6 +103,7 @@ export default function Home() {
 
   const handleCollectionTypeChange = (ct: "now" | "daily" | "weekly" | "rising") => {
     setCollectionType(ct);
+    setOffset(0);
   };
 
   return (
@@ -175,6 +186,7 @@ export default function Home() {
               onChange={(e) => {
                 const val = e.target.value;
                 setSelectedNicheId(val === "" ? undefined : Number(val));
+                setOffset(0);
               }}
               className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
@@ -247,6 +259,29 @@ export default function Home() {
             </div>
           )}
           {!loading && <TrendsGrid trends={trends} />}
+          {!loading && totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+                  disabled={offset <= 0}
+                  onClick={() => setOffset((o) => Math.max(0, o - ITEMS_PER_PAGE))}
+                >
+                  Previous
+                </button>
+                <button
+                  className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setOffset((o) => o + ITEMS_PER_PAGE)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

@@ -4,6 +4,11 @@ import type { NextRequest } from "next/server";
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
 export function middleware(request: NextRequest) {
+  // Skip all auth checks in development
+  if (process.env.NODE_ENV === "development") {
+    return NextResponse.next();
+  }
+
   const { pathname } = request.nextUrl;
 
   // Site-wide password gate (production only, when SITE_PASSWORD is set)
