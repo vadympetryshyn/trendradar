@@ -80,6 +80,16 @@ def seed_data(db: Session):
 
         _ensure_schedule_configs(db, niche.id)
 
+    # Deactivate niches that are no longer in config
+    config_slugs = {entry["slug"] for entry in niches_data}
+    stale_niches = (
+        db.query(Niche)
+        .filter(Niche.is_active.is_(True), Niche.slug.notin_(config_slugs))
+        .all()
+    )
+    for niche in stale_niches:
+        niche.is_active = False
+
     db.commit()
 
     _seed_admin(db)
