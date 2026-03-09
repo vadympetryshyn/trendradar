@@ -1,10 +1,49 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+from celery.signals import worker_ready
+
 from app.celery_app import celery_app
 from app.database import SessionLocal
 
 logger = logging.getLogger(__name__)
+
+# Maximum age (minutes) before a running/queued task is considered stuck
+STALE_TASK_TIMEOUT_MINUTES = 15
+
+
+@worker_ready.connect
+def cleanup_stale_tasks_on_startup(**kwargs):
+    """Clear any stuck tasks when the worker starts (e.g. after container rebuild)."""
+    from app.models import CollectionTask
+
+    db = SessionLocal()
+    try:
+        stuck = (
+            db.query(CollectionTask)
+            .filter(CollectionTask.status.in_(["running", "queued"]))
+            .all()
+        )
+        if not stuck:
+            logger.info("Worker startup: no stuck tasks found")
+            return
+
+        count = (
+            db.query(CollectionTask)
+            .filter(CollectionTask.status.in_(["running", "queued"]))
+            .update({
+                CollectionTask.status: "failed",
+                CollectionTask.error_message: "Auto-cleared on worker startup (container restart)",
+                CollectionTask.completed_at: datetime.now(timezone.utc),
+            })
+        )
+        db.commit()
+        logger.info(f"Worker startup: cleared {count} stuck tasks")
+    except Exception as e:
+        logger.error(f"Worker startup cleanup failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=60, soft_time_limit=600, time_limit=660)
@@ -102,13 +141,32 @@ def run_scheduled_collections():
 
     db = SessionLocal()
     try:
+        now = datetime.now(timezone.utc)
+
+        # Auto-clear tasks stuck longer than the timeout
+        stale_cutoff = now - timedelta(minutes=STALE_TASK_TIMEOUT_MINUTES)
+        stale_count = (
+            db.query(CollectionTask)
+            .filter(
+                CollectionTask.status.in_(["running", "queued"]),
+                CollectionTask.started_at < stale_cutoff,
+            )
+            .update({
+                CollectionTask.status: "failed",
+                CollectionTask.error_message: f"Auto-cleared: stuck for >{STALE_TASK_TIMEOUT_MINUTES}min",
+                CollectionTask.completed_at: now,
+            })
+        )
+        if stale_count:
+            db.commit()
+            logger.info(f"Auto-cleared {stale_count} stale tasks (>{STALE_TASK_TIMEOUT_MINUTES}min old)")
+
         configs = (
             db.query(ScheduleConfig)
             .filter(ScheduleConfig.is_enabled.is_(True))
             .all()
         )
 
-        now = datetime.now(timezone.utc)
         dispatched = 0
 
         for config in configs:
