@@ -1,15 +1,22 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from celery.signals import worker_ready
+from celery.signals import worker_process_init, worker_ready
 
 from app.celery_app import celery_app
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
 
 logger = logging.getLogger(__name__)
 
 # Maximum age (minutes) before a running/queued task is considered stuck
 STALE_TASK_TIMEOUT_MINUTES = 10
+
+
+@worker_process_init.connect
+def reset_db_connections(**kwargs):
+    """Dispose inherited DB connections after prefork so each worker gets fresh ones."""
+    engine.dispose()
+    logger.info("Worker process: disposed inherited DB connections")
 
 
 @worker_ready.connect
