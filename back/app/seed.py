@@ -10,7 +10,7 @@ from app.utils.security import hash_password
 NICHES_CONFIG = Path(__file__).resolve().parent / "niches.json"
 
 COLLECTION_DEFAULTS = {
-    "now": 30,
+    "now": 120,
     "daily": 60,
     "weekly": 1440,
 }

@@ -17,7 +17,7 @@ class ScheduleConfig(Base):
     niche_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("niches.id"), nullable=False, index=True
     )
-    interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=120)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
