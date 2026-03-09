@@ -128,14 +128,23 @@ export function getSchedulerStatus(): Promise<SchedulerStatus> {
   return fetchApi("/api/v1/admin/scheduler/status");
 }
 
-export function startScheduler(): Promise<SchedulerStatus> {
-  return fetchApi("/api/v1/admin/scheduler/start", {
+export function startScheduler(collectionType?: string): Promise<SchedulerStatus> {
+  const params = collectionType ? `?collection_type=${collectionType}` : "";
+  return fetchApi(`/api/v1/admin/scheduler/start${params}`, {
     method: "POST",
   });
 }
 
-export function stopScheduler(): Promise<SchedulerStatus> {
-  return fetchApi("/api/v1/admin/scheduler/stop", { method: "POST" });
+export function stopScheduler(collectionType?: string): Promise<SchedulerStatus> {
+  const params = collectionType ? `?collection_type=${collectionType}` : "";
+  return fetchApi(`/api/v1/admin/scheduler/stop${params}`, { method: "POST" });
+}
+
+export function cleanAndStartScheduler(collectionType?: string): Promise<SchedulerStatus> {
+  const params = collectionType ? `?collection_type=${collectionType}` : "";
+  return fetchApi(`/api/v1/admin/scheduler/clean-and-start${params}`, {
+    method: "POST",
+  });
 }
 
 export function runNow(nicheId?: number, collectionType?: string): Promise<ManualTriggerResponse> {
@@ -162,6 +171,15 @@ export function stopNicheSchedule(
   collectionType: string = "now"
 ): Promise<NicheScheduleStatus> {
   return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/stop?collection_type=${collectionType}`, {
+    method: "POST",
+  });
+}
+
+export function cleanNicheSchedule(
+  nicheId: number,
+  collectionType: string = "now"
+): Promise<NicheScheduleStatus> {
+  return fetchApi(`/api/v1/admin/scheduler/niche/${nicheId}/clean?collection_type=${collectionType}`, {
     method: "POST",
   });
 }

@@ -65,7 +65,7 @@ export default function TasksPage() {
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const perPage = 20;
+  const perPage = 100;
 
   const fetchTasks = useCallback(() => {
     return getCollectionTasks(page, perPage, statusFilter).then((data) => {

@@ -93,22 +93,22 @@ def get_scheduler_status(admin_user: AdminUser, db: Session = Depends(get_db)):
 @router.post("/scheduler/start", response_model=SchedulerStatusResponse)
 def start_scheduler(
     admin_user: AdminUser,
+    collection_type: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    (
-        db.query(ScheduleConfig)
-        .filter(
-            ScheduleConfig.niche_id.in_(
-                db.query(Niche.id).filter(Niche.is_active.is_(True))
-            )
+    query = db.query(ScheduleConfig).filter(
+        ScheduleConfig.niche_id.in_(
+            db.query(Niche.id).filter(Niche.is_active.is_(True))
         )
-        .update(
-            {
-                ScheduleConfig.is_enabled: True,
-                ScheduleConfig.updated_at: datetime.now(timezone.utc),
-            },
-            synchronize_session="fetch",
-        )
+    )
+    if collection_type:
+        query = query.filter(ScheduleConfig.collection_type == collection_type)
+    query.update(
+        {
+            ScheduleConfig.is_enabled: True,
+            ScheduleConfig.updated_at: datetime.now(timezone.utc),
+        },
+        synchronize_session="fetch",
     )
     db.commit()
 
@@ -120,22 +120,56 @@ def start_scheduler(
     return get_scheduler_status(admin_user, db)
 
 
+@router.post("/scheduler/clean-and-start", response_model=SchedulerStatusResponse)
+def clean_and_start_scheduler(
+    admin_user: AdminUser,
+    collection_type: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Clear last_run_at for all configs and enable all schedules."""
+    query = db.query(ScheduleConfig).filter(
+        ScheduleConfig.niche_id.in_(
+            db.query(Niche.id).filter(Niche.is_active.is_(True))
+        )
+    )
+    if collection_type:
+        query = query.filter(ScheduleConfig.collection_type == collection_type)
+    query.update(
+        {
+            ScheduleConfig.is_enabled: True,
+            ScheduleConfig.last_run_at: None,
+            ScheduleConfig.updated_at: datetime.now(timezone.utc),
+        },
+        synchronize_session="fetch",
+    )
+    db.commit()
+
+    from app.tasks import run_scheduled_collections
+
+    run_scheduled_collections.delay()
+
+    return get_scheduler_status(admin_user, db)
+
+
 @router.post("/scheduler/stop", response_model=SchedulerStatusResponse)
-def stop_scheduler(admin_user: AdminUser, db: Session = Depends(get_db)):
-    (
-        db.query(ScheduleConfig)
-        .filter(
-            ScheduleConfig.niche_id.in_(
-                db.query(Niche.id).filter(Niche.is_active.is_(True))
-            )
+def stop_scheduler(
+    admin_user: AdminUser,
+    collection_type: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(ScheduleConfig).filter(
+        ScheduleConfig.niche_id.in_(
+            db.query(Niche.id).filter(Niche.is_active.is_(True))
         )
-        .update(
-            {
-                ScheduleConfig.is_enabled: False,
-                ScheduleConfig.updated_at: datetime.now(timezone.utc),
-            },
-            synchronize_session="fetch",
-        )
+    )
+    if collection_type:
+        query = query.filter(ScheduleConfig.collection_type == collection_type)
+    query.update(
+        {
+            ScheduleConfig.is_enabled: False,
+            ScheduleConfig.updated_at: datetime.now(timezone.utc),
+        },
+        synchronize_session="fetch",
     )
     db.commit()
 
@@ -241,6 +275,36 @@ def stop_niche_schedule(
         raise HTTPException(status_code=404, detail="Schedule not found for this niche/collection_type")
 
     config.is_enabled = False
+    config.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(config)
+
+    trend_count = (
+        db.query(func.count(Trend.id))
+        .filter(Trend.niche_id == niche_id, Trend.status == "active", Trend.collection_type == collection_type)
+        .scalar()
+    )
+
+    return _build_niche_schedule_status(config, trend_count)
+
+
+@router.post("/scheduler/niche/{niche_id}/clean", response_model=NicheScheduleStatus)
+def clean_niche_schedule(
+    niche_id: int,
+    admin_user: AdminUser,
+    collection_type: str = Query("now"),
+    db: Session = Depends(get_db),
+):
+    """Clear last_run_at for a specific niche schedule."""
+    config = (
+        db.query(ScheduleConfig)
+        .filter(ScheduleConfig.niche_id == niche_id, ScheduleConfig.collection_type == collection_type)
+        .first()
+    )
+    if not config:
+        raise HTTPException(status_code=404, detail="Schedule not found for this niche/collection_type")
+
+    config.last_run_at = None
     config.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(config)

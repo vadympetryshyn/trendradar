@@ -21,8 +21,10 @@ import {
   getSchedulerStatus,
   startScheduler,
   stopScheduler,
+  cleanAndStartScheduler,
   startNicheSchedule,
   stopNicheSchedule,
+  cleanNicheSchedule,
   updateNicheInterval,
 } from "@/lib/api";
 import type { SchedulerStatus } from "@/lib/types";
@@ -65,13 +67,20 @@ export default function SchedulerPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const activeFilter = typeFilter === "all" ? undefined : typeFilter;
+
   const handleStart = async () => {
-    const result = await startScheduler();
+    const result = await startScheduler(activeFilter);
+    setScheduler(result);
+  };
+
+  const handleCleanAndStart = async () => {
+    const result = await cleanAndStartScheduler(activeFilter);
     setScheduler(result);
   };
 
   const handleStop = async () => {
-    const result = await stopScheduler();
+    const result = await stopScheduler(activeFilter);
     setScheduler(result);
   };
 
@@ -87,6 +96,19 @@ export default function SchedulerPage() {
         running: prev.niches.some(
           (n) => (n.niche_id === nicheId && n.collection_type === collectionType ? result.is_enabled : n.is_enabled)
         ),
+        niches: prev.niches.map((n) =>
+          n.niche_id === nicheId && n.collection_type === collectionType ? result : n
+        ),
+      };
+    });
+  };
+
+  const handleCleanNiche = async (nicheId: number, collectionType: string) => {
+    const result = await cleanNicheSchedule(nicheId, collectionType);
+    setScheduler((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
         niches: prev.niches.map((n) =>
           n.niche_id === nicheId && n.collection_type === collectionType ? result : n
         ),
@@ -148,6 +170,9 @@ export default function SchedulerPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleStart}>Enable All</Button>
+            <Button variant="secondary" onClick={handleCleanAndStart}>
+              Clean & Enable All
+            </Button>
             <Button variant="destructive" onClick={handleStop}>
               Disable All
             </Button>
@@ -192,6 +217,7 @@ export default function SchedulerPage() {
                   </th>
                   <th className="pb-2 pr-4 font-medium">Last Run</th>
                   <th className="pb-2 pr-4 font-medium">Next Run</th>
+                  <th className="pb-2 pr-4 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,6 +283,18 @@ export default function SchedulerPage() {
                         {niche.is_enabled && niche.next_run_at
                           ? new Date(niche.next_run_at).toLocaleString()
                           : "\u2014"}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleCleanNiche(niche.niche_id, niche.collection_type)
+                          }
+                          disabled={!niche.last_run_at}
+                        >
+                          Clean
+                        </Button>
                       </td>
                     </tr>
                   );
