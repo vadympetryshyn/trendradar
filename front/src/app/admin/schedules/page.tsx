@@ -27,6 +27,21 @@ import {
 } from "@/lib/api";
 import type { SchedulerStatus } from "@/lib/types";
 
+const TYPE_ORDER: Record<string, number> = {
+  now: 0,
+  daily: 1,
+  weekly: 2,
+  rising: 3,
+};
+
+const TYPE_FILTER_OPTIONS = [
+  { label: "All Types", value: "all" },
+  { label: "Now", value: "now" },
+  { label: "Daily", value: "daily" },
+  { label: "Weekly", value: "weekly" },
+  { label: "Rising", value: "rising" },
+];
+
 const INTERVAL_OPTIONS = [
   { label: "15 min", value: 15 },
   { label: "30 min", value: 30 },
@@ -42,6 +57,7 @@ const INTERVAL_OPTIONS = [
 export default function SchedulerPage() {
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("all");
 
   useEffect(() => {
     getSchedulerStatus()
@@ -141,12 +157,26 @@ export default function SchedulerPage() {
 
       {/* Per-Niche Controls */}
       <Card>
-        <CardHeader>
-          <CardTitle>Per-Niche Schedules</CardTitle>
-          <CardDescription>
-            {scheduler.niches.filter((n) => n.is_enabled).length} of{" "}
-            {scheduler.niches.length} enabled
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle>Per-Niche Schedules</CardTitle>
+            <CardDescription>
+              {scheduler.niches.filter((n) => n.is_enabled).length} of{" "}
+              {scheduler.niches.length} enabled
+            </CardDescription>
+          </div>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPE_FILTER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -165,7 +195,10 @@ export default function SchedulerPage() {
                 </tr>
               </thead>
               <tbody>
-                {scheduler.niches.map((niche) => {
+                {scheduler.niches
+                  .filter((n) => typeFilter === "all" || n.collection_type === typeFilter)
+                  .sort((a, b) => (TYPE_ORDER[a.collection_type] ?? 99) - (TYPE_ORDER[b.collection_type] ?? 99))
+                  .map((niche) => {
                   const nicheKey = `${niche.niche_id}-${niche.collection_type}`;
                   return (
                     <tr key={nicheKey} className="border-b last:border-0">
