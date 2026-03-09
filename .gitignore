@@ -25,3 +25,5 @@ build/
 postgres_data/
 redis_data/
 data/
+PROD_CREDENTIALS.md
+credential.md
