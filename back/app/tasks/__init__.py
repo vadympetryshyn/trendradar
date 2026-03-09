@@ -9,7 +9,7 @@ from app.database import SessionLocal
 logger = logging.getLogger(__name__)
 
 # Maximum age (minutes) before a running/queued task is considered stuck
-STALE_TASK_TIMEOUT_MINUTES = 15
+STALE_TASK_TIMEOUT_MINUTES = 10
 
 
 @worker_ready.connect
