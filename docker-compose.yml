@@ -30,6 +30,9 @@ services:
     volumes:
       - ./back/app:/app/app
       - ./back/alembic:/app/alembic
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    group_add:
+      - "999"
     depends_on:
       postgres:
         condition: service_healthy
