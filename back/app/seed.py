@@ -11,7 +11,7 @@ NICHES_CONFIG = Path(__file__).resolve().parent / "niches.json"
 
 COLLECTION_DEFAULTS = {
     "now": 120,
-    "daily": 60,
+    "daily": 360,
     "weekly": 1440,
 }
 
