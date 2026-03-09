@@ -112,6 +112,11 @@ def start_scheduler(
     )
     db.commit()
 
+    # Trigger collections immediately instead of waiting for next beat cycle
+    from app.tasks import run_scheduled_collections
+
+    run_scheduled_collections.delay()
+
     return get_scheduler_status(admin_user, db)
 
 
@@ -205,6 +210,11 @@ def start_niche_schedule(
     config.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(config)
+
+    # Trigger collections immediately instead of waiting for next beat cycle
+    from app.tasks import run_scheduled_collections
+
+    run_scheduled_collections.delay()
 
     trend_count = (
         db.query(func.count(Trend.id))
