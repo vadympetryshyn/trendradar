@@ -65,7 +65,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
-Identify between 5 and 20 trends, ordered by significance (highest first).
+Identify between 5 and 30 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -192,7 +192,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
-Identify between 1 and 10 potential rising trends, ordered by significance (highest first). Return an empty trends array if nothing qualifies.
+Identify between 1 and 15 potential rising trends, ordered by significance (highest first). Return an empty trends array if nothing qualifies.
 
 Return JSON in this exact format:
 {{
