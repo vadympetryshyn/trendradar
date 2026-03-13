@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ExternalTrendListItem(BaseModel):
@@ -91,7 +91,7 @@ class VectorSearchRequest(BaseModel):
     embedding: list[float]
     collection_types: list[str] = ["now", "daily"]
     niche_id: int | None = None
-    limit: int = 5
+    limit: int = Field(5, ge=1, le=20)
 
 
 class ExternalNicheResponse(BaseModel):

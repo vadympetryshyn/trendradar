@@ -48,6 +48,62 @@ GET /api/v1/trends
 
 ---
 
+### Random Trends
+
+```
+GET /api/v1/trends/random
+```
+
+Returns random active trends for a given collection type, mixed across all niches.
+
+**Query Parameters:**
+
+| Parameter         | Type   | Default | Description                                    |
+|-------------------|--------|---------|------------------------------------------------|
+| `collection_type` | string | —       | **Required.** Trend type: `now`, `rising`, `daily`, `weekly` |
+| `limit`           | int    | 20      | Results per page (1–100)                       |
+| `offset`          | int    | 0       | Pagination offset                              |
+
+**Example:**
+
+```
+GET /api/v1/trends/random?collection_type=rising
+GET /api/v1/trends/random?collection_type=daily&limit=10
+```
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "id": "abc-123",
+      "niche_id": 1,
+      "title": "Trend title",
+      "summary": "Short summary",
+      "status": "active",
+      "sentiment": "positive",
+      "category": "technology",
+      "key_points": ["point 1", "point 2"],
+      "relevance_score": 0.85,
+      "collection_type": "rising",
+      "research_done": false,
+      "collected_at": "2025-01-15T12:00:00"
+    }
+  ],
+  "total": 42,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**Notes:**
+- `collection_type` is required — returns `422` if missing
+- Results are randomly ordered on each request
+- Only returns `active` trends
+
+---
+
 ### Get Trend Detail
 
 ```
@@ -156,7 +212,7 @@ By default searches only `now` and `daily` trends and returns 5 results.
 | `embedding`        | float[]      | yes      | —                  | Pre-computed embedding vector (1536 dimensions, OpenAI `text-embedding-3-small` compatible) |
 | `collection_types` | string[]     | no       | `["now", "daily"]` | Which trend types to search: `now`, `rising`, `daily`, `weekly` |
 | `niche_id`         | int          | no       | —                  | Filter by niche                              |
-| `limit`            | int          | no       | 5                  | Number of results to return                  |
+| `limit`            | int          | no       | 5                  | Number of results to return (1–20)           |
 
 **Response:**
 

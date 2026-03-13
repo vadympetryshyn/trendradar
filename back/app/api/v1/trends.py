@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import func
 
 from app.database import get_db
 from app.models import Trend
@@ -50,6 +51,29 @@ def list_trends(
         .limit(limit)
         .all()
     )
+
+    return ExternalTrendListResponse(
+        items=[ExternalTrendListItem.model_validate(t) for t in trends],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/random", response_model=ExternalTrendListResponse)
+def random_trends(
+    collection_type: str = Query(..., description="Trend type: now, rising, daily, weekly"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Trend).filter(
+        Trend.status == "active",
+        Trend.collection_type == collection_type,
+    )
+
+    total = query.count()
+    trends = query.order_by(func.random()).offset(offset).limit(limit).all()
 
     return ExternalTrendListResponse(
         items=[ExternalTrendListItem.model_validate(t) for t in trends],
