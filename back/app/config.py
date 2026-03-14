@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://redis:6379/1"
     app_env: str = "development"
     google_api_key: str = ""
-    perplexity_api_key: str = ""
+    exa_ai_api_key: str = ""
     openai_api_key: str = ""
     xai_api_key: str = ""
     openrouter_api_key: str = ""

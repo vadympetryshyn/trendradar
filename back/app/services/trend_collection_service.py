@@ -522,13 +522,13 @@ class TrendCollectionService:
             return None
 
         if web_search and not trend.research_done:
-            logger.info(f"Researching trend '{trend.title}' via Perplexity ...")
+            logger.info(f"Researching trend '{trend.title}' via Exa AI ...")
             perplexity = PerplexityService()
             context, citations = perplexity.research_trend(
                 trend.title, trend.summary, trend.key_points
             )
             if context:
-                logger.info(f"Perplexity returned {len(citations)} citations, updating trend ...")
+                logger.info(f"Exa AI returned {len(citations)} citations, updating trend ...")
                 trend.context_summary = context
                 trend.research_citations = citations
                 trend.research_done = True

@@ -1,32 +1,19 @@
 import logging
 
-import httpx
+from exa_py import Exa
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
-
-RESEARCH_SYSTEM_PROMPT = """You are a research assistant providing factual context about trending topics.
-
-When responding, cover these aspects:
-1. What specifically happened (the event/announcement/development)
-2. Key numbers, statistics, or data points
-3. Notable quotes or statements from key figures
-4. Background context about the subject matter
-5. Why this matters and its potential impact
-6. Brief timeline of recent developments
-
-Keep your response concise (under 3000 characters). Focus on facts, not opinions.
-Always prioritize the specific event or development, not just general background."""
-
 RESEARCH_QUERY = """{title}. {summary}"""
 
 
 class PerplexityService:
+    """Web research service using Exa AI (formerly used Perplexity)."""
+
     def __init__(self):
-        self.api_key = settings.perplexity_api_key
+        self.api_key = settings.exa_ai_api_key
 
     def research_trend(
         self,
@@ -36,7 +23,7 @@ class PerplexityService:
     ) -> tuple[str | None, list[str]]:
         """Returns (content, citations) tuple."""
         if not self.api_key:
-            logger.warning("Perplexity API key not configured, skipping research")
+            logger.warning("Exa AI API key not configured, skipping research")
             return None, []
 
         try:
@@ -45,29 +32,25 @@ class PerplexityService:
                 summary=summary,
             )
 
-            with httpx.Client(timeout=60.0) as client:
-                response = client.post(
-                    PERPLEXITY_URL,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "sonar",
-                        "messages": [
-                            {"role": "system", "content": RESEARCH_SYSTEM_PROMPT},
-                            {"role": "user", "content": query},
-                        ],
-                        "max_tokens": 1024,
-                    },
-                )
-                response.raise_for_status()
-                result = response.json()
+            exa = Exa(api_key=self.api_key)
+            results = exa.search_and_contents(
+                query=query,
+                num_results=5,
+                summary={"query": query},
+                type="auto",
+            )
 
-                content = result["choices"][0]["message"]["content"]
-                citations = result.get("citations", [])
-                return content[:3000], citations
+            citations = []
+            content_parts = []
+            for r in results.results:
+                citations.append(r.url)
+                result_summary = getattr(r, "summary", None) or ""
+                content_parts.append(f"**{r.title}**\n{r.url}\n{result_summary}")
+
+            content = "\n\n---\n\n".join(content_parts)
+
+            return content[:3000], citations
 
         except Exception as e:
-            logger.error(f"Perplexity research failed for '{title}': {e}")
+            logger.error(f"Exa AI research failed for '{title}': {e}")
             return None, []

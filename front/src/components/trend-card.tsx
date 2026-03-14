@@ -63,7 +63,7 @@ export function TrendCard({ trend }: TrendCardProps) {
 
           {trend.source_subreddits.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">
-              {trend.source_subreddits.map((sub) => {
+              {[...new Set(trend.source_subreddits)].map((sub) => {
                 const name = stripSubredditPrefix(sub);
                 return (
                   <span

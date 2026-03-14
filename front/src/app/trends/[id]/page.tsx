@@ -165,7 +165,7 @@ export default function TrendDetailPage() {
             <CardDescription>
               {trend.research_done
                 ? `Researched at ${new Date(trend.researched_at!).toLocaleString()}`
-                : "On-demand research via Perplexity AI"}
+                : "On-demand research via Exa AI"}
             </CardDescription>
           </div>
           {!trend.research_done && (
@@ -183,7 +183,7 @@ export default function TrendDetailPage() {
             <div className="flex items-center gap-3 py-8 text-muted-foreground">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
               <span>
-                Researching with Perplexity AI... This may take 5-15 seconds.
+                Researching with Exa AI... This may take 5-15 seconds.
               </span>
             </div>
           )}
@@ -198,7 +198,7 @@ export default function TrendDetailPage() {
           {!researching && !trend.context_summary && !trend.research_done && (
             <p className="text-sm text-muted-foreground py-4">
               Click &quot;Research This Trend&quot; to get detailed context from
-              Perplexity AI.
+              Exa AI.
             </p>
           )}
         </CardContent>

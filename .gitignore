@@ -27,3 +27,7 @@ redis_data/
 data/
 PROD_CREDENTIALS.md
 USER_CREDENTIAL_FOR_AI.md
+scripts/backup_prod
+scripts/backup_prod_send_local
+scripts/backup_prod_send_local_import
+backups
