@@ -92,6 +92,7 @@ class VectorSearchRequest(BaseModel):
     collection_types: list[str] = ["now", "daily"]
     niche_id: int | None = None
     limit: int = Field(5, ge=1, le=20)
+    random: int | None = Field(None, ge=1, le=10)
 
 
 class ExternalNicheResponse(BaseModel):

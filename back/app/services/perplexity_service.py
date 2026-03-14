@@ -33,21 +33,18 @@ class PerplexityService:
             )
 
             exa = Exa(api_key=self.api_key)
-            results = exa.search_and_contents(
-                query=query,
-                num_results=5,
-                summary={"query": query},
-                type="auto",
+            response = exa.answer(
+                query,
+                text=False,
+                system_prompt=(
+                    "Provide a detailed and comprehensive summary 1000-3000 characters. Not short one! "
+                    "Cover all key facts, context, and details from the sources. "
+                    "Don't leave out important information!!"
+                ),
             )
 
-            citations = []
-            content_parts = []
-            for r in results.results:
-                citations.append(r.url)
-                result_summary = getattr(r, "summary", None) or ""
-                content_parts.append(f"**{r.title}**\n{r.url}\n{result_summary}")
-
-            content = "\n\n---\n\n".join(content_parts)
+            content = response.answer
+            citations = [c.url for c in response.citations]
 
             return content[:3000], citations
 

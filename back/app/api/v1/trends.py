@@ -1,3 +1,4 @@
+import random as random_module
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -157,7 +158,11 @@ def search_trends_by_vector(
     if request.niche_id is not None:
         query = query.filter(Trend.niche_id == request.niche_id)
 
-    results = query.order_by("distance").limit(request.limit).all()
+    fetch_limit = 10 if request.random else request.limit
+    results = query.order_by("distance").limit(fetch_limit).all()
+
+    if request.random:
+        results = random_module.sample(results, min(request.random, len(results)))
 
     return ExternalTrendSearchResponse(
         results=[

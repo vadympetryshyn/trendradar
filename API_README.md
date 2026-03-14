@@ -213,6 +213,7 @@ By default searches only `now` and `daily` trends and returns 5 results.
 | `collection_types` | string[]     | no       | `["now", "daily"]` | Which trend types to search: `now`, `rising`, `daily`, `weekly` |
 | `niche_id`         | int          | no       | —                  | Filter by niche                              |
 | `limit`            | int          | no       | 5                  | Number of results to return (1–20)           |
+| `random`           | int          | no       | —                  | If set, fetches top 10 results and returns this many randomly picked from them (1–10). Useful for adding variety while staying relevant. |
 
 **Response:**
 
@@ -253,6 +254,7 @@ trends = response.json()["results"]
 **Notes:**
 - The embedding must be 1536 dimensions (matching OpenAI `text-embedding-3-small`). A `422` error is returned if the dimension count is wrong.
 - Similarity is cosine similarity (0–1, higher = more relevant).
+- When `random` is set, the endpoint always fetches the top 10 most similar results, then randomly selects `random` of them. The `limit` parameter is ignored in this case.
 
 ---
 

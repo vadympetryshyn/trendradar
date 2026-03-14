@@ -19,5 +19,5 @@ fastapi-mail==1.4.2
 pydantic[email]==2.10.6
 google-auth==2.48.0
 requests==2.32.3
-exa-py==1.9.1
+exa-py
 psutil==6.1.1
