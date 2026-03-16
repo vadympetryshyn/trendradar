@@ -8,11 +8,11 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-3.1-flash-lite-preview"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite-preview"
+GEMINI_FALLBACK_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_FALLBACK_MODEL}:generateContent"
 
 
-class GeminiService:
+class LLMService:
     def __init__(self):
         self.client = httpx.Client(timeout=120.0)
         self.api_key = settings.google_api_key
@@ -107,7 +107,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
-Identify between 5 and 30 trends, ordered by significance (highest first).
+Identify between 15 and 30 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -149,7 +149,7 @@ For each trend, provide:
 - source_subreddits: An array of subreddit names where this trend appeared
 - source_post_ids: An array of post IDs (the "id" field shown in brackets) that are related to this trend — only include posts that are actually about this specific trend
 
-Identify between 20 and 50 trends, ordered by significance (highest first).
+Identify between 30 and 50 trends, ordered by significance (highest first).
 
 Return JSON in this exact format:
 {{
@@ -252,11 +252,11 @@ Here are the rising Reddit posts to analyze:
             text += posts_text
         return text
 
-    def _call_gemini(self, prompt: str) -> dict:
+    def _call_gemini_fallback(self, prompt: str) -> dict:
         for attempt in range(2):
             try:
                 response = self.client.post(
-                    GEMINI_URL,
+                    GEMINI_FALLBACK_URL,
                     params={"key": self.api_key},
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
@@ -295,7 +295,7 @@ Here are the rising Reddit posts to analyze:
     ) -> dict:
         selected = self._select_posts(posts)
         logger.info(
-            f"Selected {len(selected)} posts for Gemini analysis "
+            f"Selected {len(selected)} posts for LLM analysis "
             f"(from {len(posts)} total, collection={collection_type})"
         )
         prompt = self._build_prompt(selected, niche_name, niche_description, collection_type)
@@ -317,8 +317,8 @@ Here are the rising Reddit posts to analyze:
 
         # Fallback: direct Gemini API
         try:
-            logger.info(f"Sending posts to Gemini ({GEMINI_MODEL}) for trend analysis ...")
-            result = self._call_gemini(prompt)
+            logger.info(f"Sending posts to Gemini fallback ({GEMINI_FALLBACK_MODEL}) for trend analysis ...")
+            result = self._call_gemini_fallback(prompt)
             trend_count = len(result.get("trends", []))
             logger.info(f"Gemini analysis complete: {trend_count} trends identified")
             return result

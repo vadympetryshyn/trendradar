@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Niche, Trend, SubredditStats
 from app.services.embedding_service import get_embedding_service
-from app.services.gemini_service import GeminiService
+from app.services.llm_service import LLMService
 from app.services.perplexity_service import PerplexityService
 from app.services.reddit_service import RedditService
 
@@ -375,7 +375,7 @@ class TrendCollectionService:
         logger.info(f"Rising detection: loaded baselines for {len(baselines)} subreddits")
 
         reddit = RedditService()
-        gemini = GeminiService()
+        llm = LLMService()
         try:
             all_new_posts: list[dict] = []
             for sub in niche.subreddits:
@@ -401,7 +401,7 @@ class TrendCollectionService:
                 return {"created": 0, "expired": expired_count}
 
             logger.info(f"Rising detection: analyzing {len(filtered)} posts with Gemini ...")
-            result = gemini.analyze_posts(
+            result = llm.analyze_posts(
                 filtered,
                 niche_name=niche.name,
                 niche_description=niche.description or "",
@@ -424,7 +424,7 @@ class TrendCollectionService:
             return {"created": len(new_trends), "expired": expired_count}
         finally:
             reddit.close()
-            gemini.close()
+            llm.close()
 
     def _expire_trends(self, niche_id: int, collection_type: str) -> int:
         expired_count = (
@@ -459,7 +459,7 @@ class TrendCollectionService:
         logger.info(f"Subreddits: {', '.join(niche.subreddits)}")
 
         reddit = RedditService()
-        gemini = GeminiService()
+        llm = LLMService()
 
         try:
             logger.info("Step 1: Scraping Reddit posts ...")
@@ -474,7 +474,7 @@ class TrendCollectionService:
                 self._annotate_engagement_ratios(all_posts)
 
             logger.info(f"Step 2: Analyzing {len(all_posts)} posts with Gemini ({collection_type}) ...")
-            result = gemini.analyze_posts(
+            result = llm.analyze_posts(
                 all_posts,
                 niche_name=niche.name,
                 niche_description=niche.description or "",
@@ -514,7 +514,7 @@ class TrendCollectionService:
 
         finally:
             reddit.close()
-            gemini.close()
+            llm.close()
 
     def get_trend_by_id(self, trend_id, web_search: bool = False) -> Trend | None:
         trend = self.db.query(Trend).filter(Trend.id == trend_id).first()

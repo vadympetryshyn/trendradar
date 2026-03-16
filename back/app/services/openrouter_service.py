@@ -8,12 +8,12 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "google/gemini-3.1-flash-lite-preview"
+OPENROUTER_MODEL = "x-ai/grok-4.1-fast"
 
 
 class OpenRouterService:
     def __init__(self):
-        self.client = httpx.Client(timeout=120.0)
+        self.client = httpx.Client(timeout=300.0)
         self.api_key = settings.openrouter_api_key
 
     def call(self, prompt: str) -> dict:
@@ -29,6 +29,7 @@ class OpenRouterService:
                         "model": OPENROUTER_MODEL,
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.3,
+                        "reasoning": {"effort": "medium"},
                         "response_format": {"type": "json_object"},
                     },
                 )
