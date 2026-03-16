@@ -8,7 +8,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "google/gemini-3-flash-preview"
+OPENROUTER_MODEL = "google/gemini-3.1-flash-lite-preview"
 
 
 class OpenRouterService:
@@ -41,7 +41,7 @@ class OpenRouterService:
                 if "trends" not in parsed:
                     raise ValueError("Missing 'trends' key in OpenRouter response")
 
-                logger.info("OpenRouter fallback succeeded")
+                logger.info("OpenRouter call succeeded")
                 return parsed
 
             except (json.JSONDecodeError, KeyError, ValueError) as e:

@@ -8,7 +8,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-3-flash-preview"
+GEMINI_MODEL = "gemini-3.1-flash-lite-preview"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
@@ -300,6 +300,22 @@ Here are the rising Reddit posts to analyze:
         )
         prompt = self._build_prompt(selected, niche_name, niche_description, collection_type)
 
+        # Primary: OpenRouter
+        if settings.openrouter_api_key:
+            from app.services.openrouter_service import OpenRouterService
+            logger.info("Sending posts to OpenRouter for trend analysis ...")
+            openrouter = OpenRouterService()
+            try:
+                result = openrouter.call(prompt)
+                trend_count = len(result.get("trends", []))
+                logger.info(f"OpenRouter analysis complete: {trend_count} trends identified")
+                return result
+            except Exception as e:
+                logger.error(f"OpenRouter failed: {e}, trying direct Gemini fallback...")
+            finally:
+                openrouter.close()
+
+        # Fallback: direct Gemini API
         try:
             logger.info(f"Sending posts to Gemini ({GEMINI_MODEL}) for trend analysis ...")
             result = self._call_gemini(prompt)
@@ -307,19 +323,7 @@ Here are the rising Reddit posts to analyze:
             logger.info(f"Gemini analysis complete: {trend_count} trends identified")
             return result
         except Exception as e:
-            logger.error(f"Gemini failed: {e}, trying OpenRouter fallback...")
-            # Try OpenRouter fallback
-            if settings.openrouter_api_key:
-                from app.services.openrouter_service import OpenRouterService
-                logger.info("Falling back to OpenRouter ...")
-                openrouter = OpenRouterService()
-                try:
-                    result = openrouter.call(prompt)
-                    trend_count = len(result.get("trends", []))
-                    logger.info(f"OpenRouter fallback complete: {trend_count} trends identified")
-                    return result
-                finally:
-                    openrouter.close()
+            logger.error(f"Gemini API also failed: {e}")
             raise
 
     def close(self):
