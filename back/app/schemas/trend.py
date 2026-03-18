@@ -72,7 +72,7 @@ class TrendListResponse(BaseModel):
 
 class TrendSearchRequest(BaseModel):
     query: str
-    niche_id: int | None = None
+    niche: str | None = None
     limit: int = 10
 
 

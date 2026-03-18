@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
 
 from app.database import get_db
-from app.models import Trend
+from app.models import Niche, Trend
 from app.config import settings
 from app.schemas import (
     ExternalTrendDetail,
@@ -23,9 +23,18 @@ from app.services.trend_collection_service import TrendCollectionService
 router = APIRouter(prefix="/trends", tags=["trends"])
 
 
+def _resolve_niche_slug(db: Session, niche_slug: str | None) -> int | None:
+    if niche_slug is None:
+        return None
+    niche = db.query(Niche).filter(Niche.slug == niche_slug).first()
+    if not niche:
+        raise HTTPException(status_code=404, detail=f"Niche '{niche_slug}' not found")
+    return niche.id
+
+
 @router.get("", response_model=ExternalTrendListResponse)
 def list_trends(
-    niche_id: Optional[int] = Query(None),
+    niche_slug: Optional[str] = Query(None, alias="niche"),
     status: Optional[str] = Query(None),
     collection_type: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
@@ -39,6 +48,7 @@ def list_trends(
     else:
         query = query.filter(Trend.status == "active")
 
+    niche_id = _resolve_niche_slug(db, niche_slug)
     if niche_id is not None:
         query = query.filter(Trend.niche_id == niche_id)
 
@@ -110,8 +120,9 @@ def search_trends(
         Trend.embedding.cosine_distance(query_embedding).label("distance"),
     ).filter(Trend.embedding.isnot(None), Trend.status == "active")
 
-    if request.niche_id is not None:
-        query = query.filter(Trend.niche_id == request.niche_id)
+    niche_id = _resolve_niche_slug(db, request.niche)
+    if niche_id is not None:
+        query = query.filter(Trend.niche_id == niche_id)
 
     results = query.order_by("distance").limit(request.limit).all()
 
@@ -155,8 +166,9 @@ def search_trends_by_vector(
         Trend.collection_type.in_(request.collection_types),
     )
 
-    if request.niche_id is not None:
-        query = query.filter(Trend.niche_id == request.niche_id)
+    niche_id = _resolve_niche_slug(db, request.niche)
+    if niche_id is not None:
+        query = query.filter(Trend.niche_id == niche_id)
 
     fetch_limit = 10 if request.random else request.limit
     results = query.order_by("distance").limit(fetch_limit).all()

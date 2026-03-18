@@ -14,7 +14,7 @@ GET /api/v1/trends
 
 | Parameter         | Type    | Default  | Description                        |
 |-------------------|---------|----------|------------------------------------|
-| `niche_id`        | int     | —        | Filter by niche                    |
+| `niche`           | string  | —        | Filter by niche slug (e.g. `ai-ml`) |
 | `collection_type` | string  | —        | Filter: `now`, `rising`, `daily`, `weekly` |
 | `status`          | string  | `active` | Filter: `active`, `expired`        |
 | `limit`           | int     | 20       | Results per page (1–100)           |
@@ -44,6 +44,13 @@ GET /api/v1/trends
   "limit": 20,
   "offset": 0
 }
+```
+
+**Example:**
+
+```
+GET /api/v1/trends?niche=ai-ml&collection_type=now
+GET /api/v1/trends?niche=ai-ml&collection_type=daily&limit=10
 ```
 
 ---
@@ -156,12 +163,12 @@ POST /api/v1/trends/search
 ```json
 {
   "query": "AI tools for developers",
-  "niche_id": 1,
+  "niche": "ai-ml",
   "limit": 10
 }
 ```
 
-Only `query` is required. `niche_id` and `limit` are optional.
+Only `query` is required. `niche` and `limit` are optional.
 
 **Response:**
 
@@ -202,7 +209,7 @@ By default searches only `now` and `daily` trends and returns 5 results.
 {
   "embedding": [0.0123, -0.0456, 0.0789, "... (1536 floats)"],
   "collection_types": ["now", "daily"],
-  "niche_id": 1,
+  "niche": "ai-ml",
   "limit": 5
 }
 ```
@@ -211,7 +218,7 @@ By default searches only `now` and `daily` trends and returns 5 results.
 |--------------------|--------------|----------|--------------------|----------------------------------------------|
 | `embedding`        | float[]      | yes      | —                  | Pre-computed embedding vector (1536 dimensions, OpenAI `text-embedding-3-small` compatible) |
 | `collection_types` | string[]     | no       | `["now", "daily"]` | Which trend types to search: `now`, `rising`, `daily`, `weekly` |
-| `niche_id`         | int          | no       | —                  | Filter by niche                              |
+| `niche`            | string       | no       | —                  | Filter by niche slug (e.g. `ai-ml`)          |
 | `limit`            | int          | no       | 5                  | Number of results to return (1–20)           |
 | `random`           | int          | no       | —                  | If set, fetches top 10 results and returns this many randomly picked from them (1–10). Useful for adding variety while staying relevant. |
 
