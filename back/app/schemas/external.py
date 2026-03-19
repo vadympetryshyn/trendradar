@@ -65,6 +65,7 @@ class ExternalTrendListResponse(BaseModel):
 
 class ExternalTrendSearchResult(BaseModel):
     id: str
+    niche_id: int | None = None
     title: str
     summary: str
     sentiment: str

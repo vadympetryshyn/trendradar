@@ -130,6 +130,7 @@ def search_trends(
         results=[
             ExternalTrendSearchResult(
                 id=str(trend.id),
+                niche_id=trend.niche_id,
                 title=trend.title,
                 summary=trend.summary,
                 sentiment=trend.sentiment,
@@ -180,6 +181,7 @@ def search_trends_by_vector(
         results=[
             ExternalTrendSearchResult(
                 id=str(trend.id),
+                niche_id=trend.niche_id,
                 title=trend.title,
                 summary=trend.summary,
                 sentiment=trend.sentiment,
