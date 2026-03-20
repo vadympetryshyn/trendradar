@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "x-ai/grok-4.1-fast"
+# OPENROUTER_MODEL = "google/gemini-3.0-flash-preview"
 
 
 class OpenRouterService:
@@ -29,7 +30,7 @@ class OpenRouterService:
                         "model": OPENROUTER_MODEL,
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.3,
-                        "reasoning": {"effort": "medium"},
+                        "reasoning": {"enabled": True},
                         "response_format": {"type": "json_object"},
                     },
                 )

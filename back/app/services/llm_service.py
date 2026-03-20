@@ -8,18 +8,23 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite-preview"
-GEMINI_FALLBACK_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_FALLBACK_MODEL}:generateContent"
-
-
 class LLMService:
     def __init__(self):
         self.client = httpx.Client(timeout=120.0)
         self.api_key = settings.google_api_key
 
     def _select_posts(self, posts: list[dict]) -> list[dict]:
-        sorted_posts = sorted(posts, key=lambda p: p.get("score", 0), reverse=True)
-        return sorted_posts[:200]
+        # Force-include breakout posts (engagement_ratio >= 3x their subreddit average)
+        # so small-sub hot content isn't drowned out by large-sub volume.
+        breakout = [p for p in posts if p.get("engagement_ratio", 0) >= 3.0]
+        breakout_ids = {p["id"] for p in breakout}
+
+        rest = [p for p in posts if p["id"] not in breakout_ids]
+        rest.sort(key=lambda p: p.get("score", 0) + p.get("num_comments", 0), reverse=True)
+
+        # Breakout posts first (sorted by engagement_ratio), then the rest
+        breakout.sort(key=lambda p: p.get("engagement_ratio", 0), reverse=True)
+        return breakout + rest
 
     def _build_prompt(
         self,
@@ -252,40 +257,6 @@ Here are the rising Reddit posts to analyze:
             text += posts_text
         return text
 
-    def _call_gemini_fallback(self, prompt: str) -> dict:
-        for attempt in range(2):
-            try:
-                response = self.client.post(
-                    GEMINI_FALLBACK_URL,
-                    params={"key": self.api_key},
-                    json={
-                        "contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {
-                            "temperature": 0.3,
-                            "responseMimeType": "application/json",
-                        },
-                    },
-                )
-                response.raise_for_status()
-                result = response.json()
-
-                text = result["candidates"][0]["content"]["parts"][0]["text"]
-                parsed = json.loads(text)
-
-                if "trends" not in parsed:
-                    raise ValueError("Missing 'trends' key in response")
-
-                return parsed
-
-            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                logger.warning(f"Gemini parse attempt {attempt + 1} failed: {e}")
-                if attempt == 0:
-                    continue
-                raise
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Gemini API error: {e.response.status_code} - {e.response.text}")
-                raise
-
     def analyze_posts(
         self,
         posts: list[dict],
@@ -294,9 +265,11 @@ Here are the rising Reddit posts to analyze:
         collection_type: str = "now",
     ) -> dict:
         selected = self._select_posts(posts)
+        breakout_count = sum(1 for p in selected if p.get("engagement_ratio", 0) >= 3.0)
         logger.info(
             f"Selected {len(selected)} posts for LLM analysis "
-            f"(from {len(posts)} total, collection={collection_type})"
+            f"(from {len(posts)} total, collection={collection_type}, "
+            f"breakout_posts={breakout_count})"
         )
         prompt = self._build_prompt(selected, niche_name, niche_description, collection_type)
 
@@ -314,17 +287,6 @@ Here are the rising Reddit posts to analyze:
                 logger.error(f"OpenRouter failed: {e}, trying direct Gemini fallback...")
             finally:
                 openrouter.close()
-
-        # Fallback: direct Gemini API
-        try:
-            logger.info(f"Sending posts to Gemini fallback ({GEMINI_FALLBACK_MODEL}) for trend analysis ...")
-            result = self._call_gemini_fallback(prompt)
-            trend_count = len(result.get("trends", []))
-            logger.info(f"Gemini analysis complete: {trend_count} trends identified")
-            return result
-        except Exception as e:
-            logger.error(f"Gemini API also failed: {e}")
-            raise
 
     def close(self):
         self.client.close()
