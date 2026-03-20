@@ -1,8 +1,8 @@
 [
   {
-    "name": "AI & Technology",
-    "slug": "ai-technology",
-    "description": "Artificial intelligence, technology, programming, agents, machine learning, deep learning, LLMs, computer vision. Covers research breakthroughs, open-source tools, and industry developments, tech news. Important topics are releases of new models and significant updates of tools.",
+    "name": "AI",
+    "slug": "ai",
+    "description": "Artificial intelligence, machine learning, deep learning, LLMs, computer vision, AI agents, and prompt engineering. Covers research breakthroughs, new model releases, open-source AI tools, and significant updates in the AI ecosystem.",
     "subreddits": [
       "ChatGPT",
       "LocalLLaMA",
@@ -25,10 +25,38 @@
       "opencodeCLI",
       "AIToolTesting",
       "AI_Agents",
+      "datascience"
+    ]
+  },
+  {
+    "name": "Technology",
+    "slug": "technology",
+    "description": "Technology news, programming, software development, hardware, gadgets, cybersecurity, and tech industry trends. Covers new product launches, developer tools, open source projects, tech policy, and industry developments.",
+    "subreddits": [
+      "technology",
       "technews",
       "programming",
-      "technology",
-      "datascience"
+      "webdev",
+      "software",
+      "coding",
+      "compsci",
+      "netsec",
+      "cybersecurity",
+      "hacking",
+      "linux",
+      "apple",
+      "Android",
+      "gadgets",
+      "hardware",
+      "buildapc",
+      "sysadmin",
+      "devops",
+      "selfhosted",
+      "homelab",
+      "opensource",
+      "futurology",
+      "tech",
+      "Futurism"
     ]
   },
   {

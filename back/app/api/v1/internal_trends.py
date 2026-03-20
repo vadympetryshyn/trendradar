@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Trend
+from app.models import Niche, Trend
 from app.schemas import (
     TrendDetail,
     TrendListItem,
@@ -151,8 +151,10 @@ def search_trends(
         Trend.embedding.cosine_distance(query_embedding).label("distance"),
     ).filter(Trend.embedding.isnot(None), Trend.status == "active")
 
-    if request.niche_id is not None:
-        query = query.filter(Trend.niche_id == request.niche_id)
+    if request.niche is not None:
+        niche = db.query(Niche).filter(Niche.slug == request.niche).first()
+        if niche is not None:
+            query = query.filter(Trend.niche_id == niche.id)
 
     results = query.order_by("distance").limit(request.limit).all()
 
