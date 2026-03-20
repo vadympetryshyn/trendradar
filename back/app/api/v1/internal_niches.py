@@ -11,7 +11,7 @@ router = APIRouter(prefix="/internal/niches", tags=["internal-niches"])
 
 @router.get("", response_model=list[NicheResponse])
 def list_niches(db: Session = Depends(get_db)):
-    return db.query(Niche).filter(Niche.is_active.is_(True)).all()
+    return db.query(Niche).filter(Niche.is_active.is_(True)).order_by(Niche.sort_order).all()
 
 
 @router.get("/{niche_id}", response_model=NicheDetailResponse)

@@ -17,7 +17,7 @@ COLLECTION_TYPES = [
 
 @router.get("", response_model=list[ExternalNicheResponse])
 def list_niches(db: Session = Depends(get_db)):
-    return db.query(Niche).filter(Niche.is_active.is_(True)).all()
+    return db.query(Niche).filter(Niche.is_active.is_(True)).order_by(Niche.sort_order).all()
 
 
 @router.get("/collection-types")

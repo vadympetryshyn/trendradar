@@ -16,6 +16,7 @@ class Niche(Base):
     subreddits: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     description: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

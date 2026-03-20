@@ -54,7 +54,7 @@ def seed_data(db: Session):
 
     niches_data = json.loads(NICHES_CONFIG.read_text())
 
-    for entry in niches_data:
+    for idx, entry in enumerate(niches_data):
         existing = db.query(Niche).filter(Niche.slug == entry["slug"]).first()
         if existing:
             # Update subreddits from config if changed
@@ -64,6 +64,7 @@ def seed_data(db: Session):
             new_desc = entry.get("description", "")
             if existing.description != new_desc:
                 existing.description = new_desc
+            existing.sort_order = idx
             # Ensure all 3 schedule configs exist
             _ensure_schedule_configs(db, existing.id)
             continue
@@ -74,6 +75,7 @@ def seed_data(db: Session):
             subreddits=entry["subreddits"],
             description=entry.get("description", ""),
             is_active=True,
+            sort_order=idx,
         )
         db.add(niche)
         db.flush()
