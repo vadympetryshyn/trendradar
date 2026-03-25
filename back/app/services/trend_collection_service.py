@@ -188,8 +188,9 @@ class TrendCollectionService:
             source_titles = " ".join(
                 post_title_map.get(pid, "") for pid in source_post_ids
             )
+            key_points_text = " ".join(trend.key_points or [])
             texts_for_embedding.append(
-                f"{trend.title} {trend.summary} {source_titles}".strip()
+                f"{trend.title} {trend.summary} {key_points_text} {source_titles}".strip()
             )
 
         # Generate embeddings in batch
@@ -537,7 +538,8 @@ class TrendCollectionService:
                 # Regenerate embedding with context
                 logger.info("Regenerating embedding with research context ...")
                 embedding_service = get_embedding_service()
-                text = f"{trend.title} {trend.summary} {context}"
+                key_points_text = " ".join(trend.key_points or [])
+                text = f"{trend.title} {trend.summary} {key_points_text} {context}"
                 embedding = embedding_service.generate_embedding(text)
                 if embedding:
                     trend.embedding = embedding
