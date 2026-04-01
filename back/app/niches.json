@@ -13,7 +13,6 @@
       "artificial",
       "MachineLearning",
       "GeminiAI",
-      "ArtificialIntelligence",
       "Anthropic",
       "singularity",
       "PromptEngineering",
@@ -25,7 +24,7 @@
       "opencodeCLI",
       "AIToolTesting",
       "AI_Agents",
-      "datascience"
+      "ArtificialInteligence"
     ]
   },
   {
@@ -34,29 +33,17 @@
     "description": "Technology news, programming, software development, hardware, gadgets, cybersecurity, and tech industry trends. Covers new product launches, developer tools, open source projects, tech policy, and industry developments.",
     "subreddits": [
       "technology",
-      "technews",
+      "gadgets",
+      "futurology",
       "programming",
-      "webdev",
-      "software",
-      "coding",
-      "compsci",
-      "netsec",
-      "cybersecurity",
-      "hacking",
-      "linux",
       "apple",
       "Android",
-      "gadgets",
-      "hardware",
+      "linux",
+      "technews",
+      "webdev",
+      "cybersecurity",
       "buildapc",
-      "sysadmin",
-      "devops",
-      "selfhosted",
-      "homelab",
-      "opensource",
-      "futurology",
-      "tech",
-      "Futurism"
+      "sysadmin"
     ]
   },
   {
@@ -80,7 +67,6 @@
       "analytics",
       "shopify",
       "Instagram",
-      "Tiktokhelp",
       "NewTubers",
       "ThreadsApp",
       "influencermarketing"
@@ -96,21 +82,13 @@
       "Nutrition",
       "bodyweightfitness",
       "running",
-      "progresspics",
-      "MealPrepSunday",
-      "xxfitness",
-      "CrossFit",
-      "weightroom",
-      "gainit",
-      "flexibility",
       "yoga",
       "intermittentfasting",
-      "supplements",
       "bodybuilding",
-      "weightlifting",
-      "powerlifting",
-      "homegym",
-      "C25K"
+      "supplements",
+      "MealPrepSunday",
+      "CrossFit",
+      "weightlifting"
     ]
   },
   {
@@ -120,15 +98,12 @@
     "subreddits": [
       "CryptoCurrency",
       "Bitcoin",
-      "Dogecoin",
-      "NFT",
-      "CryptoMarkets",
       "ethereum",
-      "Altcoin",
+      "Dogecoin",
+      "CryptoMarkets",
       "defi",
-      "CryptoMoonShots",
+      "Altcoin",
       "BitcoinBeginners",
-      "CryptoTechnology",
       "SatoshiStreetBets",
       "Cardano",
       "Solana",
@@ -141,7 +116,6 @@
     "description": "Cars, trucks, EVs, automotive news, repair, buying advice, and car culture. Covers vehicle reviews, DIY maintenance, electric vehicles, market trends, detailing, project builds, and the shift to electrification across the automotive industry.",
     "subreddits": [
       "cars",
-      "IdiotsInCars",
       "Justrolledintotheshop",
       "MechanicAdvice",
       "Autos",
@@ -151,7 +125,6 @@
       "TeslaMotors",
       "electricvehicles",
       "ebikes",
-      "evcharging",
       "askcarsales",
       "UsedCars"
     ]
@@ -165,16 +138,13 @@
       "SkincareAddiction",
       "beauty",
       "AsianBeauty",
-      "drugstoreMUA",
-      "Sephora",
-      "PanPorn",
-      "MakeupRehab",
-      "muacjdiscussion",
-      "30PlusSkinCare",
-      "HairCareScience",
-      "curlyhair",
-      "Nails",
       "fragrance",
+      "curlyhair",
+      "HairCareScience",
+      "30PlusSkinCare",
+      "Sephora",
+      "drugstoreMUA",
+      "Nails",
       "RedditLaqueristas"
     ]
   },
@@ -186,18 +156,15 @@
       "Entrepreneur",
       "startups",
       "SaaS",
+      "smallbusiness",
+      "SideProject",
+      "digitalnomad",
       "indiehackers",
       "EntrepreneurRideAlong",
-      "SideProject",
-      "smallbusiness",
-      "growmybusiness",
       "microsaas",
-      "buildinpublic",
+      "nocode",
       "juststart",
-      "digitalnomad",
-      "advancedentrepreneur",
-      "Solopreneur",
-      "nocode"
+      "buildinpublic"
     ]
   },
   {
@@ -209,19 +176,14 @@
       "wallstreetbets",
       "stocks",
       "StockMarket",
-      "ValueInvesting",
-      "SecurityAnalysis",
       "options",
-      "thetagang",
-      "ETFs",
-      "dividends",
       "CryptoCurrency",
       "Bitcoin",
       "RealEstate",
       "realestateinvesting",
       "Bogleheads",
       "Fire",
-      "fatFIRE"
+      "ETFs"
     ]
   },
   {
@@ -236,19 +198,11 @@
       "XboxSeriesX",
       "NintendoSwitch",
       "Steam",
-      "GameDeals",
       "truegaming",
       "patientgamers",
       "IndieGaming",
-      "esports",
-      "gamernews",
-      "ShouldIbuythisgame",
-      "GamePass",
-      "emulation",
-      "retrogaming",
-      "MMORPG",
-      "FPS",
-      "gamedev"
+      "gamedev",
+      "GameDeals"
     ]
   },
   {
@@ -259,23 +213,15 @@
       "careerguidance",
       "jobs",
       "resumes",
-      "interviews",
-      "careeradvice",
       "cscareerquestions",
       "experienceddevs",
-      "humanresources",
-      "AskHR",
-      "recruiting",
-      "remotework",
-      "digitalnomad",
-      "overemployed",
       "antiwork",
       "WorkReform",
-      "salarynegotiation",
-      "Leadership",
-      "projectmanagement",
-      "MBA",
-      "LinkedInLunatics"
+      "interviews",
+      "careeradvice",
+      "remotework",
+      "digitalnomad",
+      "projectmanagement"
     ]
   },
   {
@@ -285,24 +231,15 @@
     "subreddits": [
       "law",
       "LawSchool",
-      "lawyers",
       "legaladvice",
-      "legaladviceofftopic",
       "Ask_Lawyers",
       "SupremeCourt",
-      "ConstitutionalLaw",
-      "criminaljustice",
-      "TrueCrime",
-      "Bad_Cop_No_Donut",
       "lawfirm",
       "barexam",
       "LawCanada",
       "uklaw",
-      "EuropeanLaw",
       "Paralegal",
-      "cyberlaws",
-      "privacy",
-      "IntellectualProperty"
+      "privacy"
     ]
   },
   {
@@ -315,21 +252,13 @@
       "FirstTimeHomeBuyer",
       "homeowners",
       "Mortgages",
-      "RealEstateCanada",
-      "HousingUK",
       "REBubble",
-      "homebuying",
+      "HomeImprovement",
       "landlords",
       "PropertyManagement",
       "CommercialRealEstate",
       "realtors",
-      "HomeImprovement",
-      "flipping",
-      "RentalInvesting",
-      "MovingToLosAngeles",
-      "SameGrassButGreener",
-      "personalfinance",
-      "Housing"
+      "homebuying"
     ]
   },
   {
@@ -340,23 +269,15 @@
       "travel",
       "solotravel",
       "backpacking",
-      "TravelHacks",
-      "Shoestring",
       "digitalnomad",
       "roadtrip",
       "campingandhiking",
       "hiking",
       "Ultralight",
-      "overlanding",
-      "TravelNoPics",
-      "AskReddit",
+      "onebag",
       "churning",
       "awardtravel",
-      "flightdeals",
-      "onebag",
-      "vanlife",
-      "photography",
-      "EarthPorn"
+      "vanlife"
     ]
   },
   {
@@ -366,24 +287,16 @@
     "subreddits": [
       "education",
       "Teachers",
-      "teaching",
       "college",
       "GradSchool",
       "AskAcademia",
-      "Professors",
-      "homeschool",
       "learnprogramming",
       "languagelearning",
       "OnlineEducation",
       "edtech",
       "studytips",
-      "GetStudying",
-      "MOOC",
-      "WGU",
       "Coursera",
-      "udemy",
-      "certifications",
-      "AcademicPhilosophy"
+      "certifications"
     ]
   },
   {
@@ -397,19 +310,11 @@
       "MealPrepSunday",
       "EatCheapAndHealthy",
       "AskCulinary",
-      "seriouseats",
       "Baking",
-      "Breadit",
-      "sousvide",
-      "smoking",
-      "grilling",
-      "fermentation",
-      "KitchenConfidential",
       "FoodPorn",
+      "seriouseats",
       "slowcooking",
-      "InstantPot",
-      "ketorecipes",
-      "veganrecipes",
+      "grilling",
       "Cocktails"
     ]
   },
@@ -425,18 +330,10 @@
       "beyondthebump",
       "NewParents",
       "toddlers",
-      "preschoolers",
       "teenagers",
-      "breakingmom",
-      "StayAtHomeDaddit",
       "workingmoms",
       "SingleParents",
-      "stepparents",
-      "SpecialNeedsChildren",
-      "homeschool",
       "ScienceBasedParenting",
-      "AttachmentParenting",
-      "SAHP",
       "Fatherhood"
     ]
   },
@@ -450,21 +347,13 @@
       "nba",
       "soccer",
       "MMA",
-      "bjj",
       "baseball",
       "hockey",
       "tennis",
       "formula1",
       "CFB",
-      "CollegeBasketball",
-      "FantasyFootball",
-      "sportsbook",
       "Boxing",
-      "Swimming",
-      "Alpinism",
-      "climbing",
-      "Olympics",
-      "sportsnews"
+      "Olympics"
     ]
   },
   {
@@ -476,22 +365,14 @@
       "femalefashionadvice",
       "streetwear",
       "fashion",
-      "FashionReps",
       "Sneakers",
-      "rawdenim",
+      "FashionReps",
       "ThriftStoreHauls",
       "frugalmalefashion",
       "FrugalFemaleFashion",
-      "sewing",
       "Watches",
-      "jewelry",
-      "menswear",
-      "womensstreetwear",
-      "sustainablefashion",
-      "Depop",
-      "VintageFashion",
-      "OutfitsOTD",
-      "luxurylifestyle"
+      "sewing",
+      "sustainablefashion"
     ]
   }
 ]

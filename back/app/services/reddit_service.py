@@ -217,23 +217,23 @@ class RedditService:
 
     def fetch_subreddit_now(self, subreddit: str) -> list[dict]:
         endpoints = [
-            f"https://www.reddit.com/r/{subreddit}/hot.json?limit=20",
+            f"https://www.reddit.com/r/{subreddit}/hot.json?limit=10",
         ]
         return self._fetch_endpoints(subreddit, endpoints, "now")
 
     def fetch_subreddit_new(self, subreddit: str) -> list[dict]:
-        endpoints = [f"https://www.reddit.com/r/{subreddit}/new.json?limit=30"]
+        endpoints = [f"https://www.reddit.com/r/{subreddit}/new.json?limit=10"]
         return self._fetch_endpoints(subreddit, endpoints, "new")
 
     def fetch_subreddit_daily(self, subreddit: str) -> list[dict]:
         endpoints = [
-            f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=30",
+            f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit=15",
         ]
         return self._fetch_endpoints(subreddit, endpoints, "daily")
 
     def fetch_subreddit_weekly(self, subreddit: str) -> list[dict]:
         endpoints = [
-            f"https://www.reddit.com/r/{subreddit}/top.json?t=week&limit=30",
+            f"https://www.reddit.com/r/{subreddit}/top.json?t=week&limit=15",
         ]
         return self._fetch_endpoints(subreddit, endpoints, "weekly")
 
