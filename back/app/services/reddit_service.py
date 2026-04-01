@@ -29,7 +29,7 @@ _CACHE_TTL = {
     "now": 10 * 60,       # 10 min — hot posts change frequently
     "daily": 30 * 60,     # 30 min
     "weekly": 60 * 60,    # 1 hour
-    "new": 5 * 60,        # 5 min — rising detection
+    "new": 5 * 60,        # 5 min
 }
 
 

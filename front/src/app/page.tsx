@@ -9,7 +9,6 @@ import type { Niche, Trend, TrendSearchResult } from "@/lib/types";
 
 const COLLECTION_TABS = [
   { value: "now" as const, label: "Trending Now" },
-  { value: "rising" as const, label: "Rising" },
   { value: "daily" as const, label: "Today's Trends" },
   { value: "weekly" as const, label: "This Week" },
 ];
@@ -24,7 +23,7 @@ export default function Home() {
   const [selectedNicheId, setSelectedNicheId] = useState<number | undefined>();
 
   // Collection type filter
-  const [collectionType, setCollectionType] = useState<"now" | "daily" | "weekly" | "rising">("now");
+  const [collectionType, setCollectionType] = useState<"now" | "daily" | "weekly">("now");
 
   // Tab counts
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
@@ -101,7 +100,7 @@ export default function Home() {
     setHasSearched(false);
   };
 
-  const handleCollectionTypeChange = (ct: "now" | "daily" | "weekly" | "rising") => {
+  const handleCollectionTypeChange = (ct: "now" | "daily" | "weekly") => {
     setCollectionType(ct);
     setOffset(0);
   };

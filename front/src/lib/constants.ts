@@ -21,10 +21,6 @@ export const COLLECTION_TYPE_STYLES: Record<
     label: "This Week",
     className: "bg-indigo-100 text-indigo-800 border-indigo-200",
   },
-  rising: {
-    label: "Rising",
-    className: "bg-orange-100 text-orange-800 border-orange-200",
-  },
 };
 
 export const STATUS_COLORS: Record<string, string> = {

@@ -187,14 +187,14 @@ export default function TrendsPage() {
 
         <div className="h-6 w-px bg-border mx-1" />
 
-        {["all", "now", "rising", "daily", "weekly"].map((ct) => (
+        {["all", "now", "daily", "weekly"].map((ct) => (
           <Badge
             key={`ct-${ct}`}
             variant={collectionTypeFilter === ct ? "default" : "outline"}
             className="cursor-pointer"
             onClick={() => { setCollectionTypeFilter(ct); setOffset(0); }}
           >
-            {ct === "all" ? "All Types" : ct === "now" ? "Now" : ct === "rising" ? "Rising" : ct === "daily" ? "Daily" : "Weekly"}
+            {ct === "all" ? "All Types" : ct === "now" ? "Now" : ct === "daily" ? "Daily" : "Weekly"}
           </Badge>
         ))}
 

@@ -73,7 +73,7 @@ def list_trends(
 
 @router.get("/random", response_model=ExternalTrendListResponse)
 def random_trends(
-    collection_type: str = Query(..., description="Trend type: now, rising, daily, weekly"),
+    collection_type: str = Query(..., description="Trend type: now, daily, weekly"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),

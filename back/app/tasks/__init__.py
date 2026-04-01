@@ -89,11 +89,6 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None,
         service = TrendCollectionService(db)
         result = service.collect_trends(niche_id, collection_type=collection_type)
 
-        # Dispatch rising detection as a separate task after "now" collections
-        if collection_type == "now":
-            collect_rising_trends.delay(niche_id)
-            logger.info(f"[Niche {niche_id}] Dispatched rising trend detection task")
-
         # Update task record with results
         task_record.status = "completed"
         task_record.trends_created = result.get("created", 0)
@@ -223,28 +218,6 @@ def run_scheduled_collections():
         logger.info(f"Scheduled check complete: {dispatched} collections dispatched")
         return {"dispatched": dispatched}
 
-    finally:
-        db.close()
-
-
-@celery_app.task(bind=True, max_retries=1, default_retry_delay=60, soft_time_limit=300, time_limit=360)
-def collect_rising_trends(self, niche_id: int):
-    from app.services.trend_collection_service import TrendCollectionService
-
-    db = SessionLocal()
-    try:
-        logger.info(f"[Niche {niche_id}] Starting rising trend collection task (celery_id={self.request.id})")
-        service = TrendCollectionService(db)
-        result = service.collect_rising_trends(niche_id)
-        logger.info(f"Rising collection completed for niche {niche_id}: {result}")
-        return {"niche_id": niche_id, "collection_type": "rising", "status": "completed", **result}
-    except Exception as exc:
-        logger.error(f"Rising collection failed for niche {niche_id}: {exc}")
-        try:
-            self.retry(exc=exc)
-        except self.MaxRetriesExceededError:
-            logger.error(f"Max retries exceeded for rising collection niche {niche_id}")
-            return {"status": "failed", "error": str(exc)}
     finally:
         db.close()
 

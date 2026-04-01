@@ -33,7 +33,6 @@ const TYPE_ORDER: Record<string, number> = {
   now: 0,
   daily: 1,
   weekly: 2,
-  rising: 3,
 };
 
 const TYPE_FILTER_OPTIONS = [
@@ -41,7 +40,6 @@ const TYPE_FILTER_OPTIONS = [
   { label: "Now", value: "now" },
   { label: "Daily", value: "daily" },
   { label: "Weekly", value: "weekly" },
-  { label: "Rising", value: "rising" },
 ];
 
 const INTERVAL_OPTIONS = [

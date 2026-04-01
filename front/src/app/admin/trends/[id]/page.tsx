@@ -93,12 +93,8 @@ export default function TrendDetailPage() {
               {trend.sentiment}
             </Badge>
             <Badge variant="secondary">{trend.category}</Badge>
-            <Badge variant="outline" className={
-              trend.collection_type === "rising"
-                ? "bg-orange-100 text-orange-800 border-orange-200"
-                : "bg-sky-100 text-sky-800 border-sky-200"
-            }>
-              {trend.collection_type === "now" ? "Now" : trend.collection_type === "rising" ? "Rising" : trend.collection_type === "daily" ? "Daily" : "Weekly"}
+            <Badge variant="outline" className="bg-sky-100 text-sky-800 border-sky-200">
+              {trend.collection_type === "now" ? "Now" : trend.collection_type === "daily" ? "Daily" : "Weekly"}
             </Badge>
             <Badge
               variant="outline"

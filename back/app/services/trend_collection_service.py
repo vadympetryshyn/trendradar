@@ -9,7 +9,7 @@ from app.models import Niche, Trend, SubredditStats
 from app.services.embedding_service import get_embedding_service
 from app.services.llm_service import LLMService
 from app.services.perplexity_service import PerplexityService
-from app.services.reddit_service import ProxyTrafficExhausted, RedditService
+from app.services.reddit_service import RedditService
 
 logger = logging.getLogger(__name__)
 
@@ -207,124 +207,6 @@ class TrendCollectionService:
         logger.info(f"Embeddings generated: {embedded_count}/{len(new_trends)} trends have embeddings")
         return new_trends
 
-    def _compute_baselines(self, hot_posts: list[dict]) -> dict[str, dict]:
-        by_sub: dict[str, list[dict]] = {}
-        now = time.time()
-        for p in hot_posts:
-            sub = p.get("subreddit", "")
-            if sub:
-                by_sub.setdefault(sub, []).append(p)
-
-        baselines = {}
-        for sub, posts in by_sub.items():
-            scores = []
-            comments = []
-            ages = []
-            velocities = []
-            for p in posts:
-                score = p.get("score", 0)
-                num_comments = p.get("num_comments", 0)
-                age_hours = max((now - p.get("created_utc", now)) / 3600, 0.01)
-                velocity = (score + num_comments) / age_hours
-                scores.append(score)
-                comments.append(num_comments)
-                ages.append(age_hours)
-                velocities.append(velocity)
-
-            n = len(posts)
-            baselines[sub] = {
-                "avg_score": sum(scores) / n,
-                "avg_comments": sum(comments) / n,
-                "avg_age_hours": sum(ages) / n,
-                "avg_velocity": sum(velocities) / n,
-                "post_count": n,
-            }
-        return baselines
-
-    def _upsert_baselines(self, baselines: dict[str, dict]) -> None:
-        for sub, stats in baselines.items():
-            existing = (
-                self.db.query(SubredditStats)
-                .filter(SubredditStats.subreddit == sub)
-                .first()
-            )
-            if existing:
-                existing.avg_score = stats["avg_score"]
-                existing.avg_comments = stats["avg_comments"]
-                existing.avg_age_hours = stats["avg_age_hours"]
-                existing.avg_velocity = stats["avg_velocity"]
-                existing.post_count = stats["post_count"]
-                existing.updated_at = datetime.now(timezone.utc)
-            else:
-                self.db.add(SubredditStats(
-                    subreddit=sub,
-                    avg_score=stats["avg_score"],
-                    avg_comments=stats["avg_comments"],
-                    avg_age_hours=stats["avg_age_hours"],
-                    avg_velocity=stats["avg_velocity"],
-                    post_count=stats["post_count"],
-                    updated_at=datetime.now(timezone.utc),
-                ))
-        self.db.flush()
-
-    def _filter_new_posts(self, new_posts: list[dict], baselines: dict[str, dict]) -> list[dict]:
-        now = time.time()
-        filtered = []
-        skip_age_young = 0
-        skip_age_old = 0
-        skip_low_score = 0
-        skip_no_baseline = 0
-        skip_low_velocity = 0
-
-        for p in new_posts:
-            age_hours = (now - p.get("created_utc", now)) / 3600
-            # Skip posts younger than 5 min or older than 3 hours
-            if age_hours < 5 / 60:
-                skip_age_young += 1
-                continue
-            if age_hours > 3:
-                skip_age_old += 1
-                continue
-            score = p.get("score", 0)
-            if score < 20:
-                skip_low_score += 1
-                continue
-
-            num_comments = p.get("num_comments", 0)
-            velocity = (score + num_comments) / max(age_hours, 0.01)
-
-            sub = p.get("subreddit", "")
-            baseline = baselines.get(sub)
-            if not baseline or baseline["avg_velocity"] <= 0:
-                skip_no_baseline += 1
-                continue
-
-            velocity_ratio = velocity / baseline["avg_velocity"]
-            if velocity_ratio < 0.3:
-                skip_low_velocity += 1
-                continue
-
-            p["velocity"] = velocity
-            p["velocity_ratio"] = velocity_ratio
-            filtered.append(p)
-
-        logger.info(
-            f"Rising filter breakdown: {len(new_posts)} total -> "
-            f"skip_age_young={skip_age_young}, skip_age_old={skip_age_old}, "
-            f"skip_low_score={skip_low_score}, skip_no_baseline={skip_no_baseline}, "
-            f"skip_low_velocity={skip_low_velocity}, passed={len(filtered)}"
-        )
-        if filtered:
-            for p in filtered[:5]:
-                logger.info(
-                    f"  Passed: r/{p.get('subreddit')} [{p['id']}] "
-                    f"score={p.get('score')}, comments={p.get('num_comments')}, "
-                    f"velocity={p['velocity']:.1f}, ratio={p['velocity_ratio']:.2f}x — {p.get('title', '')[:80]}"
-                )
-
-        filtered.sort(key=lambda x: x.get("velocity_ratio", 0), reverse=True)
-        return filtered
-
     def _annotate_engagement_ratios(self, posts: list[dict]) -> None:
         """Annotate posts with engagement_ratio vs subreddit baseline (from SubredditStats)."""
         stats_rows = self.db.query(SubredditStats).all()
@@ -341,94 +223,6 @@ class TrendCollectionService:
             if baseline > 0:
                 ratio = (p.get("score", 0) + p.get("num_comments", 0)) / baseline
                 p["engagement_ratio"] = round(ratio, 1)
-
-    def collect_rising_trends(self, niche_id: int) -> dict:
-        niche = self.db.query(Niche).filter(Niche.id == niche_id).first()
-        if not niche:
-            raise ValueError(f"Niche with id {niche_id} not found")
-
-        logger.info(f"=== Starting rising trend detection for niche '{niche.name}' (id={niche_id}) ===")
-
-        # Load baselines from SubredditStats (saved by the preceding "now" collection)
-        stats_rows = (
-            self.db.query(SubredditStats)
-            .filter(SubredditStats.subreddit.in_(niche.subreddits))
-            .all()
-        )
-        baselines = {
-            s.subreddit: {
-                "avg_score": s.avg_score,
-                "avg_comments": s.avg_comments,
-                "avg_age_hours": s.avg_age_hours,
-                "avg_velocity": s.avg_velocity,
-                "post_count": s.post_count,
-            }
-            for s in stats_rows
-            if s.avg_velocity and s.avg_velocity > 0
-        }
-
-        if not baselines:
-            logger.info("Rising detection: no baselines in DB, skipping")
-            expired = self._expire_trends(niche_id, "rising")
-            self.db.commit()
-            return {"created": 0, "expired": expired}
-
-        logger.info(f"Rising detection: loaded baselines for {len(baselines)} subreddits")
-
-        reddit = RedditService()
-        llm = LLMService()
-        try:
-            all_new_posts: list[dict] = []
-            for sub in niche.subreddits:
-                if sub not in baselines:
-                    logger.info(f"Rising detection: skipping r/{sub} (no baseline)")
-                    continue
-                try:
-                    new_posts = reddit.fetch_subreddit_new(sub)
-                    all_new_posts.extend(new_posts)
-                    logger.info(f"Rising detection: fetched {len(new_posts)} /new posts from r/{sub}")
-                except ProxyTrafficExhausted:
-                    logger.error("Rising detection: proxy traffic exhausted, aborting")
-                    break
-                except Exception as e:
-                    logger.warning(f"Rising detection: failed to fetch /new for r/{sub}: {e}")
-
-            filtered = self._filter_new_posts(all_new_posts, baselines)
-            logger.info(f"Rising detection: {len(filtered)} posts passed filter (from {len(all_new_posts)} total)")
-
-            expired_count = self._expire_trends(niche_id, "rising")
-            logger.info(f"Rising detection: expired {expired_count} previous rising trends")
-
-            if not filtered:
-                logger.info("Rising detection: no posts passed filter, skipping Gemini call")
-                self.db.commit()
-                return {"created": 0, "expired": expired_count}
-
-            logger.info(f"Rising detection: analyzing {len(filtered)} posts with Gemini ...")
-            result = llm.analyze_posts(
-                filtered,
-                niche_name=niche.name,
-                niche_description=niche.description or "",
-                collection_type="rising",
-            )
-            trends_data = result.get("trends", [])
-
-            if not trends_data:
-                logger.info("Rising detection: Gemini returned no rising trends")
-                self.db.commit()
-                return {"created": 0, "expired": expired_count}
-
-            new_trends = self._save_trends(trends_data, filtered, niche_id, "rising")
-            self.db.commit()
-
-            logger.info(
-                f"=== Rising detection complete for niche '{niche.name}': "
-                f"{len(new_trends)} created, {expired_count} expired ==="
-            )
-            return {"created": len(new_trends), "expired": expired_count}
-        finally:
-            reddit.close()
-            llm.close()
 
     def _expire_trends(self, niche_id: int, collection_type: str) -> int:
         expired_count = (
@@ -449,9 +243,6 @@ class TrendCollectionService:
         return expired_count
 
     def collect_trends(self, niche_id: int, collection_type: str = "now") -> dict:
-        if collection_type == "rising":
-            raise ValueError("'rising' cannot be triggered manually — it runs automatically within 'now' collections")
-
         niche = self.db.query(Niche).filter(Niche.id == niche_id).first()
         if not niche:
             raise ValueError(f"Niche with id {niche_id} not found")
@@ -494,15 +285,6 @@ class TrendCollectionService:
             # Save trends
             logger.info("Step 4: Saving trends and generating embeddings ...")
             new_trends = self._save_trends(trends_data, all_posts, niche.id, collection_type)
-
-            # For "now" collections, update subreddit baselines so the separate
-            # rising detection task can use them without re-fetching hot posts.
-            if collection_type == "now":
-                logger.info("Step 4b: Updating subreddit baselines ...")
-                baselines = self._compute_baselines(all_posts)
-                if baselines:
-                    self._upsert_baselines(baselines)
-                    logger.info(f"Baselines updated for {len(baselines)} subreddits")
 
             logger.info("Step 5: Committing to database ...")
             self.db.commit()
