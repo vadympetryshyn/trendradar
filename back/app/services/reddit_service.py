@@ -170,7 +170,7 @@ class RedditService:
         for url in endpoints:
             try:
                 logger.info(f"Scraping r/{subreddit} ...")
-                time.sleep(random.uniform(4, 7))
+                time.sleep(random.uniform(7, 10))
                 response = self._fetch_with_retry(url)
                 data = response.json()
 
