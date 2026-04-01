@@ -30,7 +30,6 @@ class OpenRouterService:
                         "model": OPENROUTER_MODEL,
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.3,
-                        "reasoning": {"enabled": True},
                         "response_format": {"type": "json_object"},
                     },
                 )
