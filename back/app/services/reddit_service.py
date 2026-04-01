@@ -2,6 +2,8 @@ import json
 import logging
 import random
 import time
+import uuid
+from urllib.parse import urlparse
 
 import httpx
 import redis
@@ -10,7 +12,17 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "TrendRadar/1.0 (trend analysis bot)"
+# Pool of realistic browser User-Agents — rotated per request to avoid fingerprinting
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
+]
 
 # Cache TTL per collection type (seconds)
 _CACHE_TTL = {
@@ -21,26 +33,56 @@ _CACHE_TTL = {
 }
 
 
+def _make_session_proxy(base_proxy: str) -> str:
+    """Inject a random session ID into the proxy URL to force a new IP.
+
+    DataImpulse format: username__session-XXXX:password@host:port
+    (double underscore separator, then session-<id>)
+    Each unique session ID binds to a different residential IP.
+    """
+    parsed = urlparse(base_proxy)
+    session_id = uuid.uuid4().hex[:8]
+    # Strip any existing session suffix before adding a new one
+    base_username = parsed.username.split("__session")[0]
+    new_username = f"{base_username}__session-{session_id}"
+    return parsed._replace(
+        netloc=f"{new_username}:{parsed.password}@{parsed.hostname}:{parsed.port}"
+    ).geturl()
+
+
 class ProxyTrafficExhausted(Exception):
     """Raised when the residential proxy quota is depleted."""
 
 
 class RedditService:
     def __init__(self):
-        client_kwargs = {
-            "headers": {"User-Agent": USER_AGENT},
-            "timeout": 30.0,
-            "follow_redirects": True,
-        }
+        self._base_proxy = settings.dataimpulse_proxy
+        self._use_proxy = bool(self._base_proxy)
 
-        if settings.dataimpulse_proxy:
-            client_kwargs["proxy"] = settings.dataimpulse_proxy
+        if self._use_proxy:
             logger.info("Reddit service using residential proxy")
         else:
             logger.info("Reddit service using direct connection (no proxy)")
 
-        self.client = httpx.Client(**client_kwargs)
+        self.client = self._new_client()
         self._redis = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+
+    def _new_client(self) -> httpx.Client:
+        """Create a new HTTP client with a random User-Agent and fresh proxy session."""
+        kwargs = {
+            "headers": {"User-Agent": random.choice(_USER_AGENTS)},
+            "timeout": 30.0,
+            "follow_redirects": True,
+        }
+        if self._use_proxy:
+            kwargs["proxy"] = _make_session_proxy(self._base_proxy)
+        return httpx.Client(**kwargs)
+
+    def _rotate_client(self) -> None:
+        """Close current client and create a new one with a different IP + User-Agent."""
+        self.client.close()
+        self.client = self._new_client()
+        logger.info("Rotated proxy session (new IP + User-Agent)")
 
     def _cache_key(self, subreddit: str, endpoint_type: str) -> str:
         return f"reddit:cache:{subreddit.lower()}:{endpoint_type}"
@@ -69,39 +111,49 @@ class RedditService:
                         "Residential proxy traffic exhausted — top up your DataImpulse account"
                     )
 
-                # Reddit returned HTML instead of JSON — blocked, don't retry
+                # Reddit blocked this IP (403 HTML) — rotate to a new IP and retry
                 content_type = response.headers.get("content-type", "")
                 if response.status_code == 403 and "html" in content_type:
-                    logger.warning(f"Reddit returned 403 HTML for {url} — blocked, skipping")
-                    raise httpx.HTTPStatusError(
-                        "403 blocked (HTML response)", request=response.request, response=response
-                    )
-
-                if response.status_code == 429 or response.status_code >= 500:
-                    wait = (2 ** attempt) + random.random() + 3
+                    wait = (2 ** attempt) * 5 + random.uniform(3, 8)
                     logger.warning(
-                        f"Reddit returned {response.status_code} for {url}, "
-                        f"retrying in {wait:.1f}s (attempt {attempt + 1}/{max_retries})"
+                        f"Reddit returned 403 HTML for {url} — IP blocked, "
+                        f"rotating proxy and retrying in {wait:.0f}s (attempt {attempt + 1}/{max_retries})"
                     )
                     time.sleep(wait)
+                    self._rotate_client()
+                    continue
+
+                if response.status_code == 429 or response.status_code >= 500:
+                    wait = (2 ** attempt) * 5 + random.uniform(3, 8)
+                    logger.warning(
+                        f"Reddit returned {response.status_code} for {url}, "
+                        f"retrying in {wait:.0f}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait)
+                    if response.status_code == 429:
+                        self._rotate_client()
                     continue
                 response.raise_for_status()
                 return response
-            except (ProxyTrafficExhausted, httpx.HTTPStatusError):
+            except ProxyTrafficExhausted:
+                raise
+            except httpx.HTTPStatusError:
                 raise
             except Exception as e:
                 # Catch proxy errors (407 comes as ProxyError, not HTTP response)
-                if "TRAFFIC_EXHAUSTED" in str(e):
+                err_str = str(e)
+                if "TRAFFIC_EXHAUSTED" in err_str or "NO_USER" in err_str:
                     raise ProxyTrafficExhausted(
-                        "Residential proxy traffic exhausted — top up your DataImpulse account"
+                        f"Residential proxy error: {err_str.strip()}"
                     )
                 if attempt < max_retries - 1:
-                    wait = (2 ** attempt) + random.random() + 3
-                    logger.warning(f"Request failed for {url}: {e}, retrying in {wait:.1f}s")
+                    wait = (2 ** attempt) * 5 + random.uniform(3, 8)
+                    logger.warning(f"Request failed for {url}: {e}, retrying in {wait:.0f}s")
                     time.sleep(wait)
                 else:
                     raise
-        # Final attempt without retry
+        # Final attempt with a fresh IP
+        self._rotate_client()
         response = self.client.get(url)
         response.raise_for_status()
         return response
