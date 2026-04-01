@@ -9,7 +9,7 @@ from app.models import Niche, Trend, SubredditStats
 from app.services.embedding_service import get_embedding_service
 from app.services.llm_service import LLMService
 from app.services.perplexity_service import PerplexityService
-from app.services.reddit_service import RedditService
+from app.services.reddit_service import ProxyTrafficExhausted, RedditService
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +387,9 @@ class TrendCollectionService:
                     new_posts = reddit.fetch_subreddit_new(sub)
                     all_new_posts.extend(new_posts)
                     logger.info(f"Rising detection: fetched {len(new_posts)} /new posts from r/{sub}")
+                except ProxyTrafficExhausted:
+                    logger.error("Rising detection: proxy traffic exhausted, aborting")
+                    break
                 except Exception as e:
                     logger.warning(f"Rising detection: failed to fetch /new for r/{sub}: {e}")
 
