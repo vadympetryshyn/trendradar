@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleStop, Eye, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CircleStop, Eye, Search, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -64,6 +65,7 @@ export default function TasksPage() {
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [runningNiches, setRunningNiches] = useState<Set<string>>(new Set());
+  const [nicheSearch, setNicheSearch] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const perPage = 100;
 
@@ -151,6 +153,16 @@ export default function TasksPage() {
       });
     }
   };
+
+  const filteredNiches = useMemo(() => {
+    if (!scheduler) return [];
+    const sorted = [...scheduler.niches].sort((a, b) =>
+      a.niche_name.localeCompare(b.niche_name)
+    );
+    if (!nicheSearch.trim()) return sorted;
+    const q = nicheSearch.toLowerCase();
+    return sorted.filter((n) => n.niche_name.toLowerCase().includes(q));
+  }, [scheduler, nicheSearch]);
 
   const totalPages = Math.ceil(total / perPage);
 
@@ -244,12 +256,21 @@ export default function TasksPage() {
           <CardHeader>
             <CardTitle>Tasks by Niche</CardTitle>
             <CardDescription>
-              {scheduler.niches.length} niche{scheduler.niches.length !== 1 ? "s" : ""}
+              {filteredNiches.length} of {scheduler.niches.length} niche{scheduler.niches.length !== 1 ? "s" : ""}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search niches..."
+                value={nicheSearch}
+                onChange={(e) => setNicheSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
             <div className="space-y-2">
-              {scheduler.niches.map((niche) => {
+              {filteredNiches.map((niche) => {
                 const nicheKey = `${niche.niche_id}-${niche.collection_type}`;
                 const isRunning = runningNiches.has(nicheKey);
                 return (

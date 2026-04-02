@@ -1,17 +1,31 @@
+import hashlib
 import json
 import logging
 import time
 
 import httpx
+import redis
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Cache TTL per collection type
+_LLM_CACHE_TTL = {
+    "now": 3 * 60 * 60,      # 3 hours (covers 2h interval with margin)
+    "daily": 7 * 60 * 60,    # 7 hours (covers 6h interval)
+    "weekly": 25 * 60 * 60,  # 25 hours (covers 24h interval)
+}
+
+# Minimum overlap ratio to consider a cached result reusable
+_FUZZY_MATCH_THRESHOLD = 0.9  # 90% of post IDs must match
+
+
 class LLMService:
     def __init__(self):
         self.client = httpx.Client(timeout=120.0)
         self.api_key = settings.google_api_key
+        self._redis = redis.Redis.from_url(settings.redis_url, decode_responses=True)
 
     def _select_posts(self, posts: list[dict]) -> list[dict]:
         # Force-include breakout posts (engagement_ratio >= 3x their subreddit average)
@@ -193,6 +207,58 @@ Here are the top Reddit posts from the past week:
             text += posts_text
         return text
 
+    def _cache_index_key(self, niche_name: str, collection_type: str) -> str:
+        """Redis set key that tracks all cache entries for a niche+type."""
+        slug = niche_name.lower().replace(" ", "-").replace("&", "")
+        return f"llm:index:{slug}:{collection_type}"
+
+    def _find_fuzzy_match(self, post_ids: set[str], niche_name: str, collection_type: str) -> tuple[dict | None, float]:
+        """Scan cached entries for this niche+type and return the best fuzzy match."""
+        index_key = self._cache_index_key(niche_name, collection_type)
+        cache_keys = self._redis.smembers(index_key)
+
+        best_match = None
+        best_overlap = 0.0
+
+        for ck in cache_keys:
+            data = self._redis.get(ck)
+            if not data:
+                # Expired entry — clean up index
+                self._redis.srem(index_key, ck)
+                continue
+            try:
+                entry = json.loads(data)
+            except json.JSONDecodeError:
+                self._redis.srem(index_key, ck)
+                continue
+
+            cached_ids = set(entry.get("_post_ids", []))
+            if not cached_ids:
+                continue
+
+            # Jaccard-style overlap: intersection / union
+            overlap = len(post_ids & cached_ids) / len(post_ids | cached_ids)
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_match = entry
+
+        return best_match, best_overlap
+
+    def _store_cache_entry(self, post_ids: list[str], result: dict, niche_name: str, collection_type: str) -> None:
+        """Store LLM result with post IDs for fuzzy matching."""
+        content = f"{niche_name}:{collection_type}:" + ",".join(sorted(post_ids))
+        digest = hashlib.sha256(content.encode()).hexdigest()[:16]
+        cache_key = f"llm:cache:{digest}"
+
+        ttl = _LLM_CACHE_TTL.get(collection_type, 3 * 60 * 60)
+        entry = {**result, "_post_ids": post_ids}
+        self._redis.setex(cache_key, ttl, json.dumps(entry))
+
+        # Add to index set (with same TTL so it auto-expires)
+        index_key = self._cache_index_key(niche_name, collection_type)
+        self._redis.sadd(index_key, cache_key)
+        self._redis.expire(index_key, ttl)
+
     def analyze_posts(
         self,
         posts: list[dict],
@@ -207,6 +273,51 @@ Here are the top Reddit posts from the past week:
             f"(from {len(posts)} total, collection={collection_type}, "
             f"breakout_posts={breakout_count})"
         )
+
+        # Check LLM result cache — fuzzy match on post IDs (90%+ overlap = hit)
+        post_ids = [p["id"] for p in selected]
+        post_id_set = set(post_ids)
+        logger.info(
+            f"LLM cache check: niche={niche_name}, type={collection_type}, posts={len(post_ids)}"
+        )
+        cached, overlap = self._find_fuzzy_match(post_id_set, niche_name, collection_type)
+        if cached and overlap >= _FUZZY_MATCH_THRESHOLD:
+            # Check if any NEW posts are breakout-level — if so, force reanalysis
+            cached_ids = set(cached.get("_post_ids", []))
+            new_post_ids = post_id_set - cached_ids
+            force_reanalyze = False
+            if new_post_ids:
+                new_posts = [p for p in selected if p["id"] in new_post_ids]
+                breakout_new = [p for p in new_posts if p.get("engagement_ratio", 0) >= 3.0]
+                if breakout_new:
+                    force_reanalyze = True
+                    titles = [p.get("title", "?")[:60] for p in breakout_new]
+                    logger.info(
+                        f"LLM CACHE OVERRIDE: {len(breakout_new)} breakout post(s) among "
+                        f"{len(new_post_ids)} new posts — forcing reanalysis. "
+                        f"Breakout titles: {titles}"
+                    )
+
+            if not force_reanalyze:
+                cached.pop("_post_ids", None)
+                trend_count = len(cached.get("trends", []))
+                logger.info(
+                    f"LLM CACHE HIT (fuzzy): {trend_count} cached trends returned, "
+                    f"overlap={overlap:.1%}, threshold={_FUZZY_MATCH_THRESHOLD:.0%} — skipped API call"
+                )
+                return cached
+
+        if cached and overlap >= _FUZZY_MATCH_THRESHOLD:
+            # Fell through from breakout override
+            pass
+        elif cached:
+            logger.info(
+                f"LLM CACHE MISS: best overlap={overlap:.1%}, "
+                f"below threshold={_FUZZY_MATCH_THRESHOLD:.0%} — calling OpenRouter"
+            )
+        else:
+            logger.info("LLM CACHE MISS: no cached entries found — calling OpenRouter")
+
         prompt = self._build_prompt(selected, niche_name, niche_description, collection_type)
 
         # Primary: OpenRouter
@@ -218,11 +329,17 @@ Here are the top Reddit posts from the past week:
                 result = openrouter.call(prompt)
                 trend_count = len(result.get("trends", []))
                 logger.info(f"OpenRouter analysis complete: {trend_count} trends identified")
+                self._store_cache_entry(post_ids, result, niche_name, collection_type)
+                ttl = _LLM_CACHE_TTL.get(collection_type, 3 * 60 * 60)
+                logger.info(f"LLM CACHE SET: stored {trend_count} trends, TTL={ttl}s")
                 return result
             except Exception as e:
-                logger.error(f"OpenRouter failed: {e}, trying direct Gemini fallback...")
+                logger.error(f"OpenRouter failed: {e}")
             finally:
                 openrouter.close()
+
+        logger.error("No LLM provider returned a result — returning empty trends")
+        return {"trends": []}
 
     def close(self):
         self.client.close()

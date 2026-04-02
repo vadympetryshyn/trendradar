@@ -139,7 +139,7 @@ def collect_niche_trends(self, niche_id: int, task_record_id: int | None = None,
 
 @celery_app.task
 def run_scheduled_collections():
-    from app.models import CollectionTask, ScheduleConfig
+    from app.models import CollectionTask, Niche, ScheduleConfig
 
     db = SessionLocal()
     try:
@@ -163,9 +163,11 @@ def run_scheduled_collections():
             db.commit()
             logger.info(f"Auto-cleared {stale_count} stale tasks (>{STALE_TASK_TIMEOUT_MINUTES}min old)")
 
+        # Only fetch schedules for active niches
         configs = (
             db.query(ScheduleConfig)
-            .filter(ScheduleConfig.is_enabled.is_(True))
+            .join(Niche, ScheduleConfig.niche_id == Niche.id)
+            .filter(ScheduleConfig.is_enabled.is_(True), Niche.is_active.is_(True))
             .all()
         )
 

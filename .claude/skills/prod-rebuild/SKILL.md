@@ -157,3 +157,40 @@ If `back/alembic/versions/` has new migration files, run migrations after the ba
 ```bash
 cd /var/www/trendradar && sudo docker compose -f docker-compose.prod.yml exec back alembic upgrade head
 ```
+
+## Deploying Niche Changes (`niches.json`)
+
+When `back/app/niches.json` is modified (niches added, removed, renamed, or subreddits changed):
+
+1. **Deploy normally** — rebuild `back`, `celery_worker`, `celery_beat` (niches.json is baked into the image)
+2. **Niche sync happens automatically on startup** — `seed_data()` in `app/seed.py` runs on every backend boot and:
+   - Creates new niches from the config (with `is_active=True` and 3 disabled ScheduleConfigs)
+   - Updates existing niches if subreddits/description changed (matched by `slug`)
+   - Deactivates niches whose slug is no longer in the config AND disables all their ScheduleConfigs
+3. **After deploy, verify the niche state** by running:
+   ```bash
+   cd /var/www/trendradar && sudo docker compose -f docker-compose.prod.yml exec -T back python -c "
+   from app.database import SessionLocal
+   from app.models import Niche, ScheduleConfig
+   db = SessionLocal()
+   for n in db.query(Niche).order_by(Niche.id).all():
+       enabled = db.query(ScheduleConfig).filter(ScheduleConfig.niche_id == n.id, ScheduleConfig.is_enabled == True).count()
+       print(f'id={n.id} slug={n.slug} active={n.is_active} enabled_schedules={enabled}/3')
+   db.close()
+   "
+   ```
+4. **Enable schedules for new niches** — new niches are created with all schedules disabled. Enable them via admin API or directly:
+   ```bash
+   cd /var/www/trendradar && sudo docker compose -f docker-compose.prod.yml exec -T back python -c "
+   from app.database import SessionLocal
+   from app.models import ScheduleConfig, Niche
+   db = SessionLocal()
+   # Enable all schedules for active niches
+   db.query(ScheduleConfig).join(Niche).filter(Niche.is_active == True).update({ScheduleConfig.is_enabled: True})
+   db.commit()
+   db.close()
+   print('All active niche schedules enabled')
+   "
+   ```
+
+**Important:** The scheduler (`run_scheduled_collections`) has a safety net — it joins on `Niche.is_active` so even if a stale schedule somehow remains enabled, it will never dispatch for an inactive niche.

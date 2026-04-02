@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     google_oauth_client_id: Optional[str] = None
 
     model_config = {
-        "env_file": ".env",
+        "env_file": (".env", ".env.local"),
     }
 
 

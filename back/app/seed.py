@@ -82,15 +82,19 @@ def seed_data(db: Session):
 
         _ensure_schedule_configs(db, niche.id)
 
-    # Deactivate niches that are no longer in config
+    # Deactivate niches no longer in config AND disable their schedules
     config_slugs = {entry["slug"] for entry in niches_data}
     stale_niches = (
         db.query(Niche)
-        .filter(Niche.is_active.is_(True), Niche.slug.notin_(config_slugs))
+        .filter(Niche.slug.notin_(config_slugs))
         .all()
     )
     for niche in stale_niches:
         niche.is_active = False
+        # Disable all schedules so ghost niches never run
+        db.query(ScheduleConfig).filter(
+            ScheduleConfig.niche_id == niche.id,
+        ).update({ScheduleConfig.is_enabled: False})
 
     db.commit()
 
