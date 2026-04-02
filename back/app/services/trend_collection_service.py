@@ -14,6 +14,17 @@ from app.services.reddit_service import RedditService
 logger = logging.getLogger(__name__)
 
 
+def _flatten_key_points(points: list) -> list[str]:
+    """Flatten nested lists from LLM output into a flat list of strings."""
+    flat = []
+    for item in (points or []):
+        if isinstance(item, list):
+            flat.extend(str(x) for x in item)
+        else:
+            flat.append(str(item))
+    return flat
+
+
 def _percentile_rank(values: list[float], value: float) -> float:
     n = len(values)
     if n == 0:
@@ -188,7 +199,8 @@ class TrendCollectionService:
             source_titles = " ".join(
                 post_title_map.get(pid, "") for pid in source_post_ids
             )
-            key_points_text = " ".join(trend.key_points or [])
+            trend.key_points = _flatten_key_points(trend.key_points)
+            key_points_text = " ".join(trend.key_points)
             texts_for_embedding.append(
                 f"{trend.title} {trend.summary} {key_points_text} {source_titles}".strip()
             )
@@ -323,7 +335,8 @@ class TrendCollectionService:
                 # Regenerate embedding with context
                 logger.info("Regenerating embedding with research context ...")
                 embedding_service = get_embedding_service()
-                key_points_text = " ".join(trend.key_points or [])
+                trend.key_points = _flatten_key_points(trend.key_points)
+            key_points_text = " ".join(trend.key_points)
                 text = f"{trend.title} {trend.summary} {key_points_text} {context}"
                 embedding = embedding_service.generate_embedding(text)
                 if embedding:
