@@ -336,7 +336,7 @@ class TrendCollectionService:
                 logger.info("Regenerating embedding with research context ...")
                 embedding_service = get_embedding_service()
                 trend.key_points = _flatten_key_points(trend.key_points)
-            key_points_text = " ".join(trend.key_points)
+                key_points_text = " ".join(trend.key_points)
                 text = f"{trend.title} {trend.summary} {key_points_text} {context}"
                 embedding = embedding_service.generate_embedding(text)
                 if embedding:
